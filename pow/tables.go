@@ -19,9 +19,16 @@ import (
 //
 // Bits is the number of bits used to address the ByteMap. If less than 8, set to 8.
 // Passes is the number of shuffles of the ByteMap performed.  Each pass shuffles all byte values in the map
-func (lx *LxrPow) Init(Bits, Passes uint64) *LxrPow {
+func (lx *LxrPow) Init(Loops int, Bits, Passes uint64) *LxrPow {
 	if Bits < 8 {
 		Bits = 8
+	}
+	if Bits > 32 {
+		panic("we do not allow Byte Maps greater than 4 GB in size at this time.")
+	}
+	// Negative loops are floored at zero
+	if Loops < 0 {
+		Loops = 0
 	}
 	lx.MapSize = uint64(math.Pow(2, float64(Bits)))
 	lx.Passes = Passes
@@ -99,15 +106,15 @@ func (lx *LxrPow) WriteTable(filename string) {
 // Initializes the map with an incremental sequence of bytes,
 // then does P passes, shuffling each element in a deterministic manner.
 func (lx *LxrPow) GenerateTable() {
-	var offset uint64 = 824798434557
+	var offset uint64 = 204598345089
 	lx.ByteMap = make([]byte, int(lx.MapSize))
 	// Our own "random" generator that really is just used to shuffle values
 	MapMask := lx.MapSize - 1
 	// The random index used to shuffle the ByteMap is itself computed through the ByteMap table
 	// in a deterministic pattern.
-	rand := func(i uint64) int64 {
-		offset = offset<<9 ^ offset>>1 ^ offset>>7 ^ uint64(lx.ByteMap[(offset)&MapMask])
-		return int64(uint64(offset) & MapMask)
+	rand := func(i,r uint64) uint64 {
+		offset = offset<<9 ^ offset>>7 ^ i ^ r
+		return uint64(offset) & MapMask
 	}
 
 	// Fill the ByteMap with bytes ranging from 0 to 255.  As long as MapSize%256 == 0, this
@@ -122,20 +129,21 @@ func (lx *LxrPow) GenerateTable() {
 	// the ByteMap, but maintaining the ratio of each byte value in the ByteMap list.
 	fmt.Println("Shuffling the Table")
 	period := time.Now().Unix()
+	var r uint64
 	for loops := 0; loops < int(lx.Passes); loops++ {
 		fmt.Printf("Pass %d\n", loops)
 		for i := range lx.ByteMap {
 			if (i+1)%1000 == 0 && time.Now().Unix()-period > 10 {
-				fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete\r",
+				fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete\n",
 					i/1024000,
 					len(lx.ByteMap)/1024000,
 					100*float64(i)/float64(len(lx.ByteMap)))
 				period = time.Now().Unix()
 			}
-			j := rand(uint64(i))
-			lx.ByteMap[i], lx.ByteMap[j] = lx.ByteMap[j], lx.ByteMap[i]
+			r = rand(uint64(i),r)
+			lx.ByteMap[i], lx.ByteMap[r] = lx.ByteMap[r], lx.ByteMap[i]
 		}
-		fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete",
+		fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete\n\n",
 			len(lx.ByteMap)/1024000, len(lx.ByteMap)/1024000, float64(100))
 	}
 }

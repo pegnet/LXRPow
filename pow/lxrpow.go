@@ -6,6 +6,7 @@ import (
 )
 
 type LxrPow struct {
+	Loops   int    // The number of loops translating the ByteMap
 	ByteMap []byte // Integer Offsets
 	MapSize uint64 // Size of the translation table (must be a factor of 256)
 	Passes  uint64 // Passes to generate the rand table

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var lx = new(LxrPow).Init(30, 6)
+var lx = new(LxrPow).Init(100, 30, 6)
 
 const LxrPoW_time int64 = 120
 
