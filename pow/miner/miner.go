@@ -18,11 +18,13 @@ const LxrPoW_time int64 = 120
 func main() {
 
 	pInstances := flag.Int("instances", 1, "Number of instances of the hash miners")
-	pLoop := flag.Int64("loop", 50, "Number of loops accessing ByteMap (more is slower)")
-	pBits := flag.Int64("bits", 30, "Number of bits addressing the ByteMap (more is bigger)")
+	pLoop := flag.Int("loop", 50, "Number of loops accessing ByteMap (more is slower)")
+	pBits := flag.Int("bits", 30, "Number of bits addressing the ByteMap (more is bigger)")
 	pData := flag.String("data", "A Test Phrase", "A phrase that will be mined")
 	pPhrase := flag.String("phrase", "", "private phrase hashed to ensure unique nonces for the miner")
 	pReportBar := flag.Int64("powreport", 0x0300<<48, "All Pow greater than minPow will be reported")
+
+	flag.Parse()
 	ReportingBar := uint64(*pReportBar)
 	Phrase := *pPhrase
 	Bits := *pBits
@@ -35,8 +37,24 @@ func main() {
 	phraseHash := sha256.Sum256([]byte(Phrase))
 	nonce := binary.BigEndian.Uint64(phraseHash[:]) + uint64(time.Now().UnixNano())
 
+	fmt.Printf("miner --instances=%d --loop=%d --bits=%d --data=\"%s\" --phrase=\"%s\" --powreport=0x%x \n",
+		Instances,
+		Loop,
+		Bits,
+		Data,
+		Phrase,
+		ReportingBar)
+
 	type result struct{ nonce, pow uint64 }
 	results := make(chan result, 10)
+	var updates [500]chan []byte
+	post := func() {
+		phrase := append([]byte{}, phraseHash[:]...)
+		for i := 0; i < Instances; i++ { // Allocate a channel per instance
+			updates[i] = make(chan []byte, 10) // If an go routine can't empty as fast as the main loop
+			updates[i] <- phrase
+		}
+	}
 
 	var best result
 	var hashCnt int64
@@ -44,25 +62,38 @@ func main() {
 
 	for i := 0; i < Instances; i++ {
 		nonce = nonce<<9 ^ nonce>>3 ^ uint64(i)
-		go func(a [32]byte, instance uint64) {
+		go func(update chan []byte, instance uint64) {
 			var best uint64
+			a := <-update
 			for {
-				instance = instance<<17 ^ instance>>9 ^ uint64(hashCnt) ^ uint64(instance) // diff nonce for each instance
-				h := atomic.AddInt64(&hashCnt, 1)
-				_, nPow := lx.LxrPoW(a[:], uint64(h))
-				if nPow > best || nPow > ReportingBar {
-					results <- result{instance, nPow}
-					if nPow > best {
-						best = nPow
+				for len(update) > 0 {
+					a = <-update
+					best = 0
+				}
+				for i := 0; i < 500; i++ {
+					instance = instance<<17 ^ instance>>9 ^ uint64(hashCnt) ^ uint64(instance) // diff nonce for each instance
+					h := atomic.AddInt64(&hashCnt, 1)
+					_, nPow := lx.LxrPoW(a[:], uint64(h))
+					if nPow > best || nPow > ReportingBar {
+						results <- result{instance, nPow}
+						if nPow > best {
+							best = nPow
+						}
 					}
 				}
 			}
-		}(oprHash, uint64(i))
+		}(updates[i], nonce)
 	}
 
 	// pull the results, and print the best hashes
-	for i := 0; true; {
+	hashTime := time.Now()
+	for i := 0; true; i++ {
 		r := <-results
+		time.Sleep(time.Second / 2)
+		if time.Since(hashTime) > time.Minute {
+			post()
+			best = result{}
+		}
 		if r.pow > best.pow {
 			i++
 			best = r

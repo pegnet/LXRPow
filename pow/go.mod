@@ -1,5 +1,3 @@
-module github.com/LXRPow/pow
+module github.com/pegnet/LXRPow/pow
 
 go 1.19
-
-require github.com/dustin/go-humanize v1.0.1

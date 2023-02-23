@@ -19,7 +19,7 @@ import (
 //
 // Bits is the number of bits used to address the ByteMap. If less than 8, set to 8.
 // Passes is the number of shuffles of the ByteMap performed.  Each pass shuffles all byte values in the map
-func (lx *LxrPow) Init(Loops int, Bits, Passes uint64) *LxrPow {
+func (lx *LxrPow) Init(Loops, Bits int, Passes uint64) *LxrPow {
 	if Bits < 8 {
 		Bits = 8
 	}
