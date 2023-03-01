@@ -18,7 +18,7 @@ type LxrPow struct {
 //
 // The bigger uint64, the more PoW it represents.  The first byte is the
 // number of leading bytes of FF, followed by the leading "non FF" bytes of the pow.
-func (lx LxrPow) LxrPoW(hash []byte, nonce uint64) (ffCnt, pow uint64) {
+func (lx LxrPow) LxrPoW(hash []byte, nonce uint64) (pow uint64) {
 	mask := lx.MapSize - 1
 
 	LHash := append([]byte{},
@@ -39,23 +39,8 @@ func (lx LxrPow) LxrPoW(hash []byte, nonce uint64) (ffCnt, pow uint64) {
 	// from the least significant byte to the most significant byte.  This ensures that we have to go
 	// through the complete process prior to knowing the PoW value.
 	// 
-	// Intel® Core™ i7-8809G CPU @ 3.10GHz × 8
-	// ByteMapHits    Watts
-	// 0              100 
-	// 1              80
-	// 2        	  77
-	// 4              75
-	// 8              74
-	// 16             73
-	// 32             74
-	// 64             73
-	// 128            72.5
-	// 512            72
-	// 1024	          71.5
-	// 2048           71
-	// 4096           71
-	const ByteMapHits = 2048
-	for i := 0; i < ByteMapHits; i++ {
+	
+	for i := 0; i < lx.Loops; i++ {
 		for j := len(LHash) - 1; j >= 0; j-- {
 			state = state<<17 ^ state>>7 ^ uint64(lx.ByteMap[state&mask]^LHash[j])
 			LHash[j] = byte(state)
@@ -64,27 +49,24 @@ func (lx LxrPow) LxrPoW(hash []byte, nonce uint64) (ffCnt, pow uint64) {
 	return lx.pow(LHash)
 }
 
-// Return a uint64 as the difficulty.  Where the most significant bit is bit 0:
+// Return a uint64 as the difficulty.  
 //   - Byte 0 is the Count of leading bytes of "FF"
-//   - Byte 1-7 are the following bits of the hash
+//   - Byte 1-7 the last 7 bytes of the hash
 //
-// What this does is allow difficulty to be computed by at least the first 56 bits of the hash, and as much
-// as the rest of the hash (32 bits)
+// What this does is allow difficulty to be computed from the hash in 8 bytes
 //
 // Larger values represent larger difficulties.
-func (lx LxrPow) pow(hash []byte) (ffCnt, pow uint64) {
+func (lx LxrPow) pow(hash []byte) (pow uint64) {
 	idx := uint64(0) // idx is the index of bytes to collect into the difficulty
 	for hash[idx] == 0xff && idx < uint64(len(hash)) {
 		idx++
 	}
-	cnt := uint64(idx) // The first byte is the count of leading FF's
-	pow = cnt
-	for i := 1; i < 8; i++ { // Add as much as 7 bytes as follows the FF's.
+	pow = uint64(idx) // The first byte is the count of leading FF's
+	end := len(hash)-8
+	for i := 0; i < 7; i++ { // Add the last 7 bytes of the hash
 		pow = pow << 8
-		if idx < uint64(len(hash)) { // Note that if the pow is massive, there might
-			pow = pow ^ uint64(hash[cnt]) // not be 7 following bytes
-		}
-		cnt++
+		pow += uint64(hash[end])
+		end++
 	}
-	return idx, pow // Return the pow (count of leading FF's + following bytes)
+	return pow // Return the pow 
 }

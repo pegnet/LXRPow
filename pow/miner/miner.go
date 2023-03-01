@@ -23,62 +23,76 @@ func main() {
 	pData := flag.String("data", "A Test Phrase", "A phrase that will be mined")
 	pPhrase := flag.String("phrase", "", "private phrase hashed to ensure unique nonces for the miner")
 	pReportBar := flag.Int64("powreport", 0x0300<<48, "All Pow greater than minPow will be reported")
-
+	pBlockTime := flag.Int("blocktime", 600, "Block Time in seconds (600 would be 10 minutes)")
+	pTimed := flag.Bool("timed", false, "Blocks are timed, or end on pReportBar")
 	flag.Parse()
-	ReportingBar := uint64(*pReportBar)
-	Phrase := *pPhrase
+
+	Instances := *pInstances
+	Loop := *pLoop
 	Bits := *pBits
 	Data := *pData
-	Loop := *pLoop
-	Instances := *pInstances
+	Phrase := *pPhrase
+	ReportingBar := uint64(*pReportBar)
+	BlockTime := *pBlockTime
+	Timed := *pTimed
 
 	lx := new(pow.LxrPow).Init(Loop, Bits, 6)
 	oprHash := sha256.Sum256([]byte(Data))
 	phraseHash := sha256.Sum256([]byte(Phrase))
 	nonce := binary.BigEndian.Uint64(phraseHash[:]) + uint64(time.Now().UnixNano())
 
-	fmt.Printf("miner --instances=%d --loop=%d --bits=%d --data=\"%s\" --phrase=\"%s\" --powreport=0x%x \n",
+	fmt.Printf("\nminer --instances=%d --loop=%d --bits=%d --data=\"%s\""+
+		" --phrase=\"%s\" --powreport=0x%x --blocktime=%d timed=%v\n\n",
 		Instances,
 		Loop,
 		Bits,
 		Data,
 		Phrase,
-		ReportingBar)
+		ReportingBar,
+		BlockTime,
+		Timed,
+	)
 
 	type result struct{ nonce, pow uint64 }
-	results := make(chan result, 10)
+	results := make(chan result, 1000)
+
 	var updates [500]chan []byte
+
 	post := func() {
-		phrase := append([]byte{}, phraseHash[:]...)
 		for i := 0; i < Instances; i++ { // Allocate a channel per instance
-			updates[i] = make(chan []byte, 10) // If an go routine can't empty as fast as the main loop
-			updates[i] <- phrase
+			if updates[i] == nil {
+				updates[i] = make(chan []byte, 1000) // If an go routine can't empty as fast as the main loop
+			}
+			updates[i] <- oprHash[:]
 		}
+		oprHash = sha256.Sum256(oprHash[:])
 	}
 
 	var best result
 	var hashCnt int64
 	start := time.Now()
 
+	post()
+
 	for i := 0; i < Instances; i++ {
-		nonce = nonce<<9 ^ nonce>>3 ^ uint64(i)
-		go func(update chan []byte, instance uint64) {
+		nonce = nonce<<32 ^ nonce<<9 ^ nonce>>3 ^ uint64(i)
+		fmt.Printf("Nonce %d: %x\n", i, nonce)
+		go func(update chan []byte, iNonce uint64) {
 			var best uint64
-			a := <-update
+			var a []byte
+			a = <-update
 			for {
 				for len(update) > 0 {
 					a = <-update
 					best = 0
 				}
-				for i := 0; i < 500; i++ {
-					instance = instance<<17 ^ instance>>9 ^ uint64(hashCnt) ^ uint64(instance) // diff nonce for each instance
-					h := atomic.AddInt64(&hashCnt, 1)
-					_, nPow := lx.LxrPoW(a[:], uint64(h))
-					if nPow > best || nPow > ReportingBar {
-						results <- result{instance, nPow}
-						if nPow > best {
-							best = nPow
-						}
+				iNonce = iNonce<<17 ^ iNonce>>9 ^ uint64(hashCnt) ^ uint64(iNonce) // diff nonce for each instance
+				atomic.AddInt64(&hashCnt, 1)
+				nPow := lx.LxrPoW(a[:], iNonce)
+				if nPow > best {
+					results <- result{iNonce, nPow}
+					if nPow > best {
+						best = nPow
 					}
 				}
 			}
@@ -87,27 +101,62 @@ func main() {
 
 	// pull the results, and print the best hashes
 	hashTime := time.Now()
-	for i := 0; true; i++ {
-		r := <-results
-		time.Sleep(time.Second / 2)
-		if time.Since(hashTime) > time.Minute {
+	var BlockCnt, TotalDifficulty uint64
+	for i := 0; true; {
+		if Timed && time.Since(hashTime) > time.Second*time.Duration(BlockTime) {
+			BlockCnt++
+			TotalDifficulty += best.pow
+			AvgDifficulty := TotalDifficulty / BlockCnt
+			current := time.Since(start)
+			sinceLast := time.Since(hashTime)
+			rate := float64(hashCnt) / float64(current.Nanoseconds()) * 1000000000
+			coreRate := rate / float64(Instances)
+			average := current / time.Duration(BlockCnt)
+			fmt.Printf("  %3s time: %10s Th: %10d Th/s: %12.5f Ch/s: %12.5f Pow: %016x Hash: %20x Nonce: %016x\n",
+				"",
+				fmt.Sprintf("%3d:%02d:%02d", int(sinceLast.Hours()), int(sinceLast.Minutes())%60, int(sinceLast.Seconds())%60),
+				hashCnt, rate, coreRate, best.pow, oprHash[:16], best.nonce)
+			fmt.Printf("Total Block Count: %d Average Block Time: %3d:%02d:%02d Average Difficulty: %016x\n\n",
+				BlockCnt,
+				int(average.Hours()), int(average.Minutes())%60, int(average.Seconds())%60,
+				AvgDifficulty,
+			)
 			post()
 			best = result{}
+			hashTime = time.Now()
+			fmt.Println()
+			i = 0
 		}
-		if r.pow > best.pow {
-			i++
-			best = r
-			current := time.Since(start)
-			rate := float64(hashCnt) / float64(current.Nanoseconds()) * 1000000000
-			fmt.Printf("  %3d time: %10s TH: %10d H/s: %12.5f Pow: %016x Hash: %64x Nonce: %016x\n",
-				i, fmt.Sprintf("%3d:%02d:%02d", int(current.Hours()), int(current.Minutes())%60, int(current.Seconds())%60),
-				hashCnt, rate, r.pow, oprHash, r.nonce)
-		} else if r.pow > best.pow || r.pow > ReportingBar {
-			current := time.Since(start)
-			rate := float64(hashCnt) / float64(current.Nanoseconds()) * 1000000000
-			fmt.Printf("      time: %10s TH: %10d H/s: %12.5f Pow: %016x\n",
-				fmt.Sprintf("%3d:%02d:%02d", int(current.Hours()), int(current.Minutes())%60, int(current.Seconds())%60),
-				hashCnt, rate, r.pow)
+		time.Sleep(time.Millisecond * 200)
+		for len(results) > 0 {
+			r := <-results
+			if r.pow > best.pow {
+				i++
+				best = r
+				current := time.Since(start)
+				sinceLast := time.Since(hashTime)
+				rate := float64(hashCnt) / float64(current.Nanoseconds()) * 1000000000
+				coreRate := rate / float64(Instances)
+				fmt.Printf("  %3d time: %10s Th: %10d Th/s: %12.5f Ch/s: %12.5f Pow: %016x Hash: %20x Nonce: %016x\n",
+					i,
+					fmt.Sprintf("%3d:%02d:%02d", int(sinceLast.Hours()), int(sinceLast.Minutes())%60, int(sinceLast.Seconds())%60),
+					hashCnt, rate, coreRate, r.pow, oprHash[:16], r.nonce)
+				if !Timed && r.pow > ReportingBar {
+					BlockCnt++
+					TotalDifficulty += best.pow
+					AvgDifficulty := TotalDifficulty / BlockCnt
+					average := current / time.Duration(BlockCnt)
+					fmt.Printf("Total Block Count: %d Average Block Time: %3d:%02d:%02d Average Difficulty: %016x\n\n",
+						BlockCnt,
+						int(average.Hours()), int(average.Minutes())%60, int(average.Seconds())%60,
+						AvgDifficulty,
+					)
+					post()
+					hashTime = time.Now()
+					best = result{}
+					i = 0
+				}
+			}
 		}
 	}
 }

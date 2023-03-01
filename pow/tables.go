@@ -32,6 +32,7 @@ func (lx *LxrPow) Init(Loops, Bits int, Passes uint64) *LxrPow {
 	}
 	lx.MapSize = uint64(math.Pow(2, float64(Bits)))
 	lx.Passes = Passes
+	lx.Loops = Loops
 	lx.ReadTable()
 	return lx
 }
@@ -130,8 +131,8 @@ func (lx *LxrPow) GenerateTable() {
 	fmt.Println("Shuffling the Table")
 	period := time.Now().Unix()
 	var r uint64
-	for loops := 0; loops < int(lx.Passes); loops++ {
-		fmt.Printf("Pass %d\n", loops)
+	for i := 0; i < int(lx.Passes); i++ {
+		fmt.Printf("Pass %d\n", i)
 		for i := range lx.ByteMap {
 			if (i+1)%1000 == 0 && time.Now().Unix()-period > 10 {
 				fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete\n",

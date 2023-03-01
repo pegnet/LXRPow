@@ -8,7 +8,7 @@ import (
 )
 
 func TestLxrPow_Init(t *testing.T) {
-	for i:= uint64(8); i<31; i++ {
+	for i:= 8; i<31; i++ {
 		p := new(LxrPow)
  		p.Init(100,i,6)
 		

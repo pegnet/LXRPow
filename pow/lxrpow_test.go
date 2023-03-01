@@ -10,12 +10,12 @@ import (
 	"time"
 )
 
-var lx = new(LxrPow).Init(100, 30, 6)
+var lx = new(LxrPow).Init(50, 30, 6)
 
 const LxrPoW_time int64 = 120
 
 func Test_LxrPoW(t *testing.T) {
-	ReportingBar := uint64(0x0300<<48)
+	ReportingBar := uint64(0x0200<<48)
 
 	type result struct{ nonce, pow uint64 }
 	results := make(chan result, 10)
@@ -34,7 +34,7 @@ func Test_LxrPoW(t *testing.T) {
 			for {
 				nonce = nonce<<17 ^ nonce>>9 ^ uint64(hashCnt) ^ uint64(instance) // diff nonce for each instance
 				h := atomic.AddInt64(&hashCnt, 1)
-				_, nPow := lx.LxrPoW(a[:], uint64(h))
+				nPow := lx.LxrPoW(a[:], uint64(h))
 				if nPow > best  || nPow > ReportingBar  {
 					results <- result{nonce, nPow}
 					if nPow > best {
