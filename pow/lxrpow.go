@@ -3,6 +3,7 @@ package pow
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 )
 
 type LxrPow struct {
@@ -49,24 +50,8 @@ func (lx LxrPow) LxrPoW(hash []byte, nonce uint64) (pow uint64) {
 	return lx.pow(LHash)
 }
 
-// Return a uint64 as the difficulty.  
-//   - Byte 0 is the Count of leading bytes of "FF"
-//   - Byte 1-7 the last 7 bytes of the hash
-//
-// What this does is allow difficulty to be computed from the hash in 8 bytes
-//
-// Larger values represent larger difficulties.
+// Return the first 8 bytes of the modified hash as the difficulty
 func (lx LxrPow) pow(hash []byte) (pow uint64) {
-	idx := uint64(0) // idx is the index of bytes to collect into the difficulty
-	for hash[idx] == 0xff && idx < uint64(len(hash)) {
-		idx++
-	}
-	pow = uint64(idx) // The first byte is the count of leading FF's
-	end := len(hash)-8
-	for i := 0; i < 7; i++ { // Add the last 7 bytes of the hash
-		pow = pow << 8
-		pow += uint64(hash[end])
-		end++
-	}
+	pow = binary.BigEndian.Uint64(hash)
 	return pow // Return the pow 
 }
