@@ -19,7 +19,7 @@ import (
 //
 // Bits is the number of bits used to address the ByteMap. If less than 8, set to 8.
 // Passes is the number of shuffles of the ByteMap performed.  Each pass shuffles all byte values in the map
-func (lx *LxrPow) Init(Loops, Bits int, Passes uint64) *LxrPow {
+func (lx *LxrPow) Init(Loops, Bits int, Passes int) *LxrPow {
 	if Bits < 8 {
 		Bits = 8
 	}
@@ -51,7 +51,7 @@ func (lx *LxrPow) ReadTable() {
 		panic(fmt.Sprintf("Could not create the directory %s", lxrPowPath))
 	}
 	bits := math.Log2(float64(lx.MapSize))
-	filename := fmt.Sprintf(lxrPowPath+"/lxrpow-%x-passes-%d-bits.dat", lx.Passes, int64(bits))
+	filename := fmt.Sprintf(lxrPowPath+"/lxrpow-%04x-passes-%02d-bits.dat", lx.Passes, int64(bits))
 	// Try and load our byte map.
 	fmt.Printf("Reading ByteMap Table %s\n", filename)
 
@@ -131,20 +131,17 @@ func (lx *LxrPow) GenerateTable() {
 	fmt.Println("Shuffling the Table")
 	period := time.Now().Unix()
 	var r uint64
-	for i := 0; i < int(lx.Passes); i++ {
-		fmt.Printf("Pass %d\n", i)
+	for i := 0; i < lx.Passes; i++ {
+		fmt.Printf("Pass %2d ", i)
 		for i := range lx.ByteMap {
 			if (i+1)%1000 == 0 && time.Now().Unix()-period > 10 {
-				fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete\n",
-					i/1024000,
-					len(lx.ByteMap)/1024000,
-					100*float64(i)/float64(len(lx.ByteMap)))
+				fmt.Printf(".")
 				period = time.Now().Unix()
 			}
 			r = rand(uint64(i),r)
 			lx.ByteMap[i], lx.ByteMap[r] = lx.ByteMap[r], lx.ByteMap[i]
 		}
-		fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete\n\n",
+		fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete\n",
 			len(lx.ByteMap)/1024000, len(lx.ByteMap)/1024000, float64(100))
 	}
 }

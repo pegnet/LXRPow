@@ -10,7 +10,7 @@ type LxrPow struct {
 	Loops   int    // The number of loops translating the ByteMap
 	ByteMap []byte // Integer Offsets
 	MapSize uint64 // Size of the translation table (must be a factor of 256)
-	Passes  uint64 // Passes to generate the rand table
+	Passes  int    // Passes to generate the rand table
 }
 
 // LxrPoW() returns a 64 byte value indicating the proof of work of a hash
@@ -39,8 +39,8 @@ func (lx LxrPow) LxrPoW(hash []byte, nonce uint64) (pow uint64) {
 	// Make a number of passes through the hash.  Note that we make complete passes over the hash,
 	// from the least significant byte to the most significant byte.  This ensures that we have to go
 	// through the complete process prior to knowing the PoW value.
-	// 
-	
+	//
+
 	for i := 0; i < lx.Loops; i++ {
 		for j := len(LHash) - 1; j >= 0; j-- {
 			state = state<<17 ^ state>>7 ^ uint64(lx.ByteMap[state&mask]^LHash[j])
@@ -53,5 +53,5 @@ func (lx LxrPow) LxrPoW(hash []byte, nonce uint64) (pow uint64) {
 // Return the first 8 bytes of the modified hash as the difficulty
 func (lx LxrPow) pow(hash []byte) (pow uint64) {
 	pow = binary.BigEndian.Uint64(hash)
-	return pow // Return the pow 
+	return pow // Return the pow
 }

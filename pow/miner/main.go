@@ -175,8 +175,8 @@ func main() {
 					WindowDifficulty += float64(best.pow)
 					AvgWindowDifficulty := WindowDifficulty / WindowBlockCnt
 					average := current / time.Duration(BlockCnt)
-					avgSec := int(average.Seconds()) % 60
-					avgMs := int((average.Seconds()-float64(avgSec))*1000)
+					avgSec := int(average.Seconds())
+					avgMs := int((average.Seconds() - float64(avgSec)) * 1000)
 					fmt.Printf("Total Block Count: %d Average Block Time: %3d:%02d:%02d.%03d Average Difficulty: %016x Average Window Difficulty: %016x \n\n",
 						int64(BlockCnt),
 						int(average.Hours()), int(average.Minutes())%60, avgSec, avgMs,
@@ -213,7 +213,6 @@ func main() {
 						WindowBlockCnt = 0
 						WindowDifficulty = 0
 						WindowTime = 0
-
 					}
 				}
 			}
