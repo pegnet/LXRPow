@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pegnet/LXRPow/pow"
+	"github.com/pegnet/LXRPow/pow/miner/hashing"
 )
 
 const LxrPoW_time int64 = 120
@@ -38,7 +39,7 @@ func main() {
 	BlockTime := *pBlockTime
 	Timed := *pTimed
 
-	lx := new(pow.LxrPow).Init(Loop, Bits, 6)
+	lx := hashing.CreatePowInstance(Loop,Bits,6)
 	oprHash := sha256.Sum256([]byte(Data))
 	phraseHash := sha256.Sum256([]byte(Phrase))
 	nonce := binary.BigEndian.Uint64(phraseHash[:]) + uint64(time.Now().UnixNano())
