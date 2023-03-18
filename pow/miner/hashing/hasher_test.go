@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/pegnet/LXRPow/pow"
 	. "github.com/pegnet/LXRPow/pow/miner/hashing"
 )
 
 func Test_Hasher(t *testing.T) {
-	lx := CreatePowInstance(32, 30, 6)
-	m := NewMiner(1000,lx)
+	lx := new(pow.LxrPow)
+	lx.Init(32, 30, 6)
+	m := NewHasher(1000, lx)
 	m.Start()
 	hash := sha256.Sum256([]byte{1, 2, 3, 4})
 	m.BlockHashes <- hash[:]

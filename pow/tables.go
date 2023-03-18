@@ -19,7 +19,7 @@ import (
 //
 // Bits is the number of bits used to address the ByteMap. If less than 8, set to 8.
 // Passes is the number of shuffles of the ByteMap performed.  Each pass shuffles all byte values in the map
-func (lx *LxrPow) Init(Loops, Bits int, Passes int) *LxrPow {
+func (lx *LxrPow) Init(Loops, Bits, Passes int) *LxrPow {
 	if Bits < 8 {
 		Bits = 8
 	}
@@ -113,7 +113,7 @@ func (lx *LxrPow) GenerateTable() {
 	MapMask := lx.MapSize - 1
 	// The random index used to shuffle the ByteMap is itself computed through the ByteMap table
 	// in a deterministic pattern.
-	rand := func(i,r uint64) uint64 {
+	rand := func(i, r uint64) uint64 {
 		offset = offset<<9 ^ offset>>7 ^ i ^ r
 		return uint64(offset) & MapMask
 	}
@@ -138,7 +138,7 @@ func (lx *LxrPow) GenerateTable() {
 				fmt.Printf(".")
 				period = time.Now().Unix()
 			}
-			r = rand(uint64(i),r)
+			r = rand(uint64(i), r)
 			lx.ByteMap[i], lx.ByteMap[r] = lx.ByteMap[r], lx.ByteMap[i]
 		}
 		fmt.Printf(" Index %10d Meg of %10d Meg -- Pass is %5.1f%% Complete\n",

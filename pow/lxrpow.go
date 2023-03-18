@@ -13,6 +13,22 @@ type LxrPow struct {
 	Passes  int    // Passes to generate the rand table
 }
 
+// NewLxrPow
+//
+// Return a new instance of the LxrPow work function
+// Loops  - the number of passes through the hash made through the hash itself.  More 
+//          loops will slow down the hash function.
+// Bits   - number of bits used to create the ByteMap. 30 bits creates a 1 GB ByteMap
+// Passes - Number of shuffles used to randomize the ByteMap. 6 seems sufficient
+// 
+// Any change to Loops, Bits, or Passes will map the PoW to a completely different 
+// space.
+func NewLxrPow(Loops, Bits, Passes int) *LxrPow {
+	lx := new(LxrPow)
+	lx.Init(Loops, Bits, Passes)
+	return lx
+}
+
 // LxrPoW() returns a 64 byte value indicating the proof of work of a hash
 // This is designed to allow the use of any hash function, but make the grading
 // of the proof of work dependent on the random byte access limits of LXRHash.

@@ -3,14 +3,17 @@
 package hashing
 
 import (
+	"fmt"
+
 	"github.com/pegnet/LXRPow/pow"
 )
 
 type PoWSolution struct {
-	Hash    []byte
-	Nonce   uint64
-	Pow     uint64
-	HashCnt uint64
+	TokenURL string
+	Hash     []byte
+	Nonce    uint64
+	Pow      uint64
+	HashCnt  uint64
 }
 
 // All that is needed to create a Hasher instance.  Once it is created,
@@ -24,35 +27,40 @@ type Hasher struct {
 	Best        uint64
 	Started     bool
 	lx          *pow.LxrPow
+	HashCnt     uint64
 }
 
-func NewMiner(nonce uint64, lx *pow.LxrPow) *Hasher {
+func NewHasher(nonce uint64, lx *pow.LxrPow) *Hasher {
 	m := new(Hasher)
 	m.Nonce = nonce
-	m.BlockHashes = make(chan []byte, 100)
-	m.Solutions = make(chan PoWSolution, 100)
-	m.Control = make(chan string, 5)
+
+	// Inputs to the Hasher
+	m.Control = make(chan string, 1)     // The Hasher stops when told on this channel
+	m.BlockHashes = make(chan []byte, 1) // Hashes to Hash are read from this channel
+
+	// Outputs from the Hasher (can be overwritten and thus shared across Hashers)
+	m.Solutions = make(chan PoWSolution, 1) // Solutions are written to this channel
+
 	m.lx = lx
 	return m
 }
 
-func CreatePowInstance(Loops, Bits, Passes int) *pow.LxrPow {
-	lx := new(pow.LxrPow)
-	lx.Init(Loops, Bits, Passes)
-	return lx
-}
-
 func (m *Hasher) Stop() {
+	if !m.Started {
+		return
+	}
 	m.Control <- "stop"
 	m.Started = false
+	fmt.Println("Stopping Instance")
 }
 
 func (m *Hasher) Start() {
 	if m.Started {
 		return
 	}
+	m.Started = true
 	go func() {
-		var best, hashCnt uint64
+		var best uint64
 		var hash []byte
 
 		hash = <-m.BlockHashes
@@ -67,12 +75,11 @@ func (m *Hasher) Start() {
 				}
 			default:
 			}
-
-			hashCnt++
-			m.Nonce ^= m.Nonce<<17 ^ m.Nonce>>9 ^ hashCnt // diff nonce for each instance
+			m.HashCnt++
+			m.Nonce ^= m.Nonce<<17 ^ m.Nonce>>9 ^ m.HashCnt // diff nonce for each instance
 			nPow := m.lx.LxrPoW(hash, m.Nonce)
 			if nPow > best {
-				m.Solutions <- PoWSolution{hash, m.Nonce, nPow, hashCnt}
+				m.Solutions <- PoWSolution{"",hash, m.Nonce, nPow, m.HashCnt}
 				best = nPow
 
 			}
