@@ -64,7 +64,8 @@ func (h *Hashers) Start() {
 		return
 	}
 	h.Started = true
-	go func() {
+
+   	go func() {
 		for {
 			select {
 			case hash := <-h.BlockHashes:

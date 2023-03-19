@@ -10,7 +10,7 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "pow/miner/miner.go",
+            "program": "miner/miner.go",
             "args": ["--instances","7",
             "--loop","32", 
             "--bits","30","--difficulty","0xffff000000000000","--diffwindow","5","--blocktime","10","timed=false" ]

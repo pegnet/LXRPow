@@ -5,7 +5,7 @@ package main
 import (
 	"crypto/sha256"
 	"fmt"
-	"net/url"
+	//"net/url"
 	"sync"
 	"time"
 

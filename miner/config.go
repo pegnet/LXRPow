@@ -10,9 +10,11 @@ import (
 	"net/url"
 	"os"
 	"time"
+	"github.com/pegnet/LXRPow/pow"
 )
 
 type Config struct {
+	Index      uint64 // Index of this mining instance
 	TokenURL   string // URL for rewards
 	Instances  int    // How many hashers to run
 	Loop       int    // How many times we loop over a hash computing PoW
@@ -23,6 +25,7 @@ type Config struct {
 	BlockTime  int    // Used when ending blocks with time (uniform blocks)
 	Timed      bool   // True if using timed blocks, false using difficulty
 
+	LX *pow.LxrPow // The Proof of work function to be used.
 	Seed uint64
 }
 
@@ -30,6 +33,7 @@ type Config struct {
 // What 
 func (c *Config) Init() {
 
+	pIndex := flag.Uint64("index",1,"Index of the miner, where many miners may work together")
 	pTokenURL := flag.String("tokenurl","","URL for where rewards go, and identify the ADI")
 	pInstances := flag.Int("instances", 1, "Number of instances of the hash miners")
 	pLoop := flag.Int("loop", 50, "Number of loops accessing ByteMap (more is slower)")
@@ -41,6 +45,7 @@ func (c *Config) Init() {
 	pTimed := flag.Bool("timed", false, "Blocks are timed, or blocks end with a given difficulty")
 	flag.Parse()
 
+	c.Index = *pIndex
 	c.TokenURL = *pTokenURL
 	c.Instances = *pInstances
 	c.Loop = *pLoop
@@ -52,11 +57,11 @@ func (c *Config) Init() {
 	c.Timed = *pTimed
 
 	h := sha256.Sum256([]byte(c.Phrase))
-	c.Seed = binary.BigEndian.Uint64(h[:]) + uint64(time.Now().UnixNano())
+	c.Seed = binary.BigEndian.Uint64(h[:]) ^ uint64(time.Now().UnixNano()) ^ c.Index
 
-	fmt.Printf("\nminer --instances=%d --loop=%d --bits=%d --phrase=\"%s\" --difficulty=0x%x"+
+	fmt.Printf("\nminer --index=%d --instances=%d --loop=%d --bits=%d --phrase=\"%s\" --difficulty=0x%x"+
 		" --diffwindow=%d --blocktime=%d --timed=%v\n\n",
-		c.Instances, c.Loop, c.Bits, c.Phrase, c.Difficulty, c.Window, c.BlockTime, c.Timed,
+		c.Index, c.Instances, c.Loop, c.Bits, c.Phrase, c.Difficulty, c.Window, c.BlockTime, c.Timed,
 	)
 	fmt.Printf("Filename: out-instances%d-loop%d-difficulty0x%x-diffwindow%d-blocktime%d-timed_%v.txt\n\n",
 		c.Instances, c.Loop, c.Difficulty, c.Window, c.BlockTime, c.Timed)
@@ -64,6 +69,8 @@ func (c *Config) Init() {
 	if	!ConfigIsValid(c) {
 		os.Exit(1)
 	}
+
+	c.LX = pow.NewLxrPow(c.Loop,c.Bits,6)
 }
 
 func NewConfig() *Config {

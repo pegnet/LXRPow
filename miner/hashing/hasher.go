@@ -26,13 +26,14 @@ type Hasher struct {
 	Control     chan string
 	Best        uint64
 	Started     bool
-	lx          *pow.LxrPow
 	HashCnt     uint64
+	LX          *pow.LxrPow
 }
 
 func NewHasher(nonce uint64, lx *pow.LxrPow) *Hasher {
 	m := new(Hasher)
 	m.Nonce = nonce
+	m.LX = lx
 
 	// Inputs to the Hasher
 	m.Control = make(chan string, 1)     // The Hasher stops when told on this channel
@@ -41,7 +42,6 @@ func NewHasher(nonce uint64, lx *pow.LxrPow) *Hasher {
 	// Outputs from the Hasher (can be overwritten and thus shared across Hashers)
 	m.Solutions = make(chan PoWSolution, 1) // Solutions are written to this channel
 
-	m.lx = lx
 	return m
 }
 
@@ -58,6 +58,7 @@ func (m *Hasher) Start() {
 	if m.Started {
 		return
 	}
+
 	m.Started = true
 	go func() {
 		var best uint64
@@ -77,9 +78,9 @@ func (m *Hasher) Start() {
 			}
 			m.HashCnt++
 			m.Nonce ^= m.Nonce<<17 ^ m.Nonce>>9 ^ m.HashCnt // diff nonce for each instance
-			nPow := m.lx.LxrPoW(hash, m.Nonce)
+			nPow := m.LX.LxrPoW(hash, m.Nonce)
 			if nPow > best {
-				m.Solutions <- PoWSolution{"",hash, m.Nonce, nPow, m.HashCnt}
+				m.Solutions <- PoWSolution{"", hash, m.Nonce, nPow, m.HashCnt}
 				best = nPow
 
 			}

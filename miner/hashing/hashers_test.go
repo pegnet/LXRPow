@@ -22,7 +22,7 @@ func Test_Hashers(t *testing.T) {
 	m.BlockHashes <- hash[:]
 
 	var best PoWSolution
-	for i := 0; i < 1; {
+	for i := 0; i < 1000; {
 		s := <-m.Solutions
 		if s.Pow > best.Pow {
 			var th uint64
