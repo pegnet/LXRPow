@@ -2,8 +2,9 @@ package miner
 
 import (
 	"fmt"
+
+	"github.com/pegnet/LXRPow/hashing"
 	"github.com/pegnet/LXRPow/pow"
-	
 )
 
 type Miner struct {
@@ -20,11 +21,11 @@ func (m *Miner) Init(cfg *Config) {
 	// Input to the Miner
 	m.Control = make(chan string, 1) // The Hasher stops when told on this channel
 	// Outputs of hashers to the Miners
-	m.Solutions = make(chan hashing.PoWSolution, 1) // Solutions are written to this channel
-	m.Cfg.LX = pow.NewLxrPow(cfg.Loop, cfg.Bits, 6) // Allocate the LxrPow
-	m.Hashers = hashing.NewHasher(cfg.Seed, m.Cfg)  // Allocate the Hashers
-	m.Hashers.Solutions = m.Solutions               // Override their Solutions channel
-	m.Hashers.Start()                               // Start the Hashers
+	m.Solutions = make(chan hashing.PoWSolution, 1)   // Solutions are written to this channel
+	m.Cfg.LX = pow.NewLxrPow(cfg.Loop, cfg.Bits, 6)   // Allocate the LxrPow
+	m.Hashers = hashing.NewHasher(cfg.Seed, m.Cfg.LX) // Allocate the Hashers
+	m.Hashers.Solutions = m.Solutions                 // Override their Solutions channel
+	m.Hashers.Start()                                 // Start the Hashers
 }
 
 func (m *Miner) Stop() {
@@ -62,7 +63,10 @@ func (m *Miner) Start() {
 				}
 			default:
 			}
-			height, hash = GetNextPow(Cfg, height)
+			height, hash = GetNextPow(m.Cfg, height)
+			if hash != nil {
+				m.Hashers.BlockHashes <- hash
+			}
 		}
 	}()
 }

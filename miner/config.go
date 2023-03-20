@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/pegnet/LXRPow/pow"
 )
 
 type Config struct {

@@ -1,3 +1,3 @@
-module github.com/pegnet/LXRPow/m
+module github.com/pegnet/LXRPow
 
 go 1.20

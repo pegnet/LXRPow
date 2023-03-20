@@ -9,6 +9,6 @@ const LxrPoW_time int64 = 120
 func main() {
 	c := miner.NewConfig()
 	c.Init()
-	// m := new(Miner)
-	// m.Init(c)
+	m := new(miner.Miner)
+	m.Init(c)
 }
