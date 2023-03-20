@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pegnet/LXRPow/miner/hashing"
+	"github.com/pegnet/LXRPow/hashing"
 )
 
 var start = time.Now()
