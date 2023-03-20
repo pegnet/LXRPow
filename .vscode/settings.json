@@ -4,6 +4,7 @@
         "diffwindow",
         "Hasher",
         "Hashers",
+        "pegnet",
         "tokenurl"
     ]
 }

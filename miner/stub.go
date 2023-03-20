@@ -1,6 +1,6 @@
 // Copyright (c) of parts are held by the various contributors
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
-package main
+package miner
 
 import (
 	"crypto/sha256"
@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pegnet/LXRPow/pow/miner/hashing"
+	"github.com/pegnet/LXRPow/miner/hashing"
 )
 
 var start = time.Now()

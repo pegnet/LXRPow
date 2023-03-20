@@ -1,6 +1,6 @@
 // Copyright (c) of parts are held by the various contributors
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
-package main
+package miner
 
 import (
 	"crypto/sha256"
@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"os"
 	"time"
-	"github.com/pegnet/LXRPow/pow"
+
 )
 
 type Config struct {

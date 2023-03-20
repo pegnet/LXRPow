@@ -1,9 +1,7 @@
-package main
+package miner
 
 import (
 	"fmt"
-
-	"github.com/pegnet/LXRPow/miner/hashing"
 	"github.com/pegnet/LXRPow/pow"
 	
 )
