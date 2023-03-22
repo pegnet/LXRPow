@@ -41,7 +41,7 @@ func (c *Config) Init() {
 	pLoop := flag.Int("loop", 50, "Number of loops accessing ByteMap (more is slower)")
 	pBits := flag.Int("bits", 30, "Number of bits addressing the ByteMap (more is bigger)")
 	pPhrase := flag.String("phrase", "", "private phrase hashed to ensure unique nonces for the miner")
-	pDifficulty := flag.Uint64("difficulty", 0x0300<<48, "Difficulty target (timed) or difficulty termination (not timed)")
+	pDifficulty := flag.Uint64("difficulty", 0xffff<<48, "Difficulty target (timed) or difficulty termination (not timed)")
 	pDiffWindow := flag.Int("diffwindow", 1000, "Difficulty Target Valuation in blocks")
 	pBlockTime := flag.Int("blocktime", 600, "Block Time in seconds (600 would be 10 minutes)")
 	pTimed := flag.Bool("timed", false, "Blocks are timed, or blocks end with a given difficulty")
