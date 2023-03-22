@@ -5,15 +5,25 @@
     "version": "0.2.0",
     "configurations": [
 
-        {
-            "name": "Run Miner",
+        { // Runs 7 instances of the hasher while mining
+            "name": "Run Seven",
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "miner/miner.go",
-            "args": ["--instances","7",
-            "--loop","32", 
-            "--bits","30","--difficulty","0xffff000000000000","--diffwindow","5","--blocktime","10","timed=false" ]
+            "program": "main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","7",
+            "--loop","32","--bits","30","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
         },
-    ]
+        { // Runs 1 instance of hasher while mining
+            "name": "Run One",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","1",
+            "--loop","32","--bits","30","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+    ],
 }

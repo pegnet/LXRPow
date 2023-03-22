@@ -30,11 +30,11 @@ func NewHashers(Instances int, Nonce uint64, Lx *pow.LxrPow) *Hashers {
 	h.Lx = Lx
 	h.BlockHashes = make(chan []byte, 1)
 	h.Solutions = make(chan PoWSolution, 1)
-	h.Control = make(chan string,1)
+	h.Control = make(chan string, 1)
 
 	for i := 0; i < Instances; i++ {
-		n := h.Nonce
-		n = n<<19 ^ n>>11 ^ uint64((i + 17))
+		n := h.Nonce ^ uint64(i)
+		n = n<<19 ^ n>>11
 
 		instance := NewHasher(n, Lx)
 		instance.Solutions = h.Solutions // override Solutions channel
@@ -45,6 +45,15 @@ func NewHashers(Instances int, Nonce uint64, Lx *pow.LxrPow) *Hashers {
 	}
 
 	return h
+}
+
+// SetSolutions
+// Direct solutions to the given solutions channel
+func (h *Hashers) SetSolutions(solutions chan PoWSolution) {
+	h.Solutions = solutions
+	for _, hasher := range h.Instances {
+		hasher.Solutions = solutions
+	}
 }
 
 func (h *Hashers) Stop() {
@@ -65,7 +74,7 @@ func (h *Hashers) Start() {
 	}
 	h.Started = true
 
-   	go func() {
+	go func() {
 		for {
 			select {
 			case hash := <-h.BlockHashes:

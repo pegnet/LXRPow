@@ -1,6 +1,6 @@
 // Copyright (c) of parts are held by the various contributors
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
-package miner
+package cfg
 
 import (
 	"crypto/sha256"
@@ -33,7 +33,8 @@ type Config struct {
 // Init
 // What 
 func (c *Config) Init() {
-
+	args := os.Args
+	_=args
 	pIndex := flag.Uint64("index",1,"Index of the miner, where many miners may work together")
 	pTokenURL := flag.String("tokenurl","","URL for where rewards go, and identify the ADI")
 	pInstances := flag.Int("instances", 1, "Number of instances of the hash miners")
@@ -60,9 +61,9 @@ func (c *Config) Init() {
 	h := sha256.Sum256([]byte(c.Phrase))
 	c.Seed = binary.BigEndian.Uint64(h[:]) ^ uint64(time.Now().UnixNano()) ^ c.Index
 
-	fmt.Printf("\nminer --index=%d --instances=%d --loop=%d --bits=%d --phrase=\"%s\" --difficulty=0x%x"+
+	fmt.Printf("\nminer --index=%d --tokenurl=\"%s\" --instances=%d --loop=%d --bits=%d --phrase=\"%s\" --difficulty=0x%x"+
 		" --diffwindow=%d --blocktime=%d --timed=%v\n\n",
-		c.Index, c.Instances, c.Loop, c.Bits, c.Phrase, c.Difficulty, c.Window, c.BlockTime, c.Timed,
+		c.Index, c.TokenURL, c.Instances, c.Loop, c.Bits, c.Phrase, c.Difficulty, c.Window, c.BlockTime, c.Timed,
 	)
 	fmt.Printf("Filename: out-instances%d-loop%d-difficulty0x%x-diffwindow%d-blocktime%d-timed_%v.txt\n\n",
 		c.Instances, c.Loop, c.Difficulty, c.Window, c.BlockTime, c.Timed)
@@ -87,7 +88,7 @@ func NewConfig() *Config {
 func ConfigIsValid(cfg *Config) bool {
 	success := true
 	if cfg.TokenURL == "" {
-		fmt.Println("must have a ADI based token url for rewards")
+		fmt.Println("must have a (tokenurl) ADI based token url for rewards")
 		success = false
 	}
 	_, err := url.Parse(cfg.TokenURL)
