@@ -26,17 +26,17 @@ type Config struct {
 	BlockTime  int    // Used when ending blocks with time (uniform blocks)
 	Timed      bool   // True if using timed blocks, false using difficulty
 
-	LX *pow.LxrPow // The Proof of work function to be used.
+	LX   *pow.LxrPow // The Proof of work function to be used.
 	Seed uint64
 }
 
 // Init
-// What 
+// What
 func (c *Config) Init() {
 	args := os.Args
-	_=args
-	pIndex := flag.Uint64("index",1,"Index of the miner, where many miners may work together")
-	pTokenURL := flag.String("tokenurl","","URL for where rewards go, and identify the ADI")
+	_ = args
+	pIndex := flag.Uint64("index", 1, "Index of the miner, where many miners may work together")
+	pTokenURL := flag.String("tokenurl", "redwagon.acme/tokens", "URL for where rewards go, and identify the ADI")
 	pInstances := flag.Int("instances", 1, "Number of instances of the hash miners")
 	pLoop := flag.Int("loop", 50, "Number of loops accessing ByteMap (more is slower)")
 	pBits := flag.Int("bits", 30, "Number of bits addressing the ByteMap (more is bigger)")
@@ -67,12 +67,12 @@ func (c *Config) Init() {
 	)
 	fmt.Printf("Filename: out-instances%d-loop%d-difficulty0x%x-diffwindow%d-blocktime%d-timed_%v.txt\n\n",
 		c.Instances, c.Loop, c.Difficulty, c.Window, c.BlockTime, c.Timed)
-	
-	if	!ConfigIsValid(c) {
+
+	if !ConfigIsValid(c) {
 		os.Exit(1)
 	}
 
-	c.LX = pow.NewLxrPow(c.Loop,c.Bits,6)
+	c.LX = pow.NewLxrPow(c.Loop, c.Bits, 6)
 }
 
 func NewConfig() *Config {

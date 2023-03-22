@@ -11,7 +11,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "miner/main.go",
-            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","7",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","10",
             "--loop","32","--bits","30","--difficulty","0xffff000000000000",
             "--diffwindow","5","--blocktime","10","timed=false" ]
         },
