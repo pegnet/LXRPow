@@ -5,24 +5,114 @@
     "version": "0.2.0",
     "configurations": [
 
-        { // Runs 7 instances of the hasher while mining
-            "name": "Run Seven",
+        { // Runs 100 instances of the hasher while mining
+            "name": "Run 100",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "miner/main.go",
-            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","10",
-            "--loop","32","--bits","30","--difficulty","0xffff000000000000",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","100",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },        
+        { // Runs 10 instances of the hasher while mining
+        "name": "Run 10",
+        "type": "go",
+        "request": "launch",
+        "mode": "auto",
+        "program": "miner/main.go",
+        "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","10",
+        "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+        "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+        { // Runs 9 instances of the hasher while mining
+            "name": "Run 9",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "miner/main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","9",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+        { // Runs 8 instances of the hasher while mining
+            "name": "Run 8",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "miner/main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","8",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+        { // Runs 7 instances of the hasher while mining
+            "name": "Run 7",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "miner/main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","7",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
             "--diffwindow","5","--blocktime","10","timed=false" ]
         },
         { // Runs 1 instance of hasher while mining
-            "name": "Run One",
+            "name": "Run 6",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "miner/main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","6",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+        { // Runs 1 instance of hasher while mining
+            "name": "Run 5",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "miner/main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","5",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+        { // Runs 1 instance of hasher while mining
+            "name": "Run 4",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "miner/main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","4",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+        { // Runs 1 instance of hasher while mining
+            "name": "Run 3",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "miner/main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","3",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+        { // Runs 1 instance of hasher while mining
+            "name": "Run 2",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "miner/main.go",
+            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","2",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
+            "--diffwindow","5","--blocktime","10","timed=false" ]
+        },
+        { // Runs 1 instance of hasher while mining
+            "name": "Run 1",
             "type": "go",
             "request": "launch",
             "mode": "auto",
             "program": "miner/main.go",
             "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","1",
-            "--loop","32","--bits","30","--difficulty","0xffff000000000000",
+            "--loop","16","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
             "--diffwindow","5","--blocktime","10","timed=false" ]
         },
     ],

@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pegnet/LXRPow/accumulate"
 	"github.com/pegnet/LXRPow/cfg"
 	"github.com/pegnet/LXRPow/hashing"
 )
 
 type Miner struct {
 	Cfg       *cfg.Config
-	Hashers   *hashing.Hashers
+	Hashers   *hashing.HasherSet
 	Started   bool
 	Solutions chan hashing.PoWSolution
 	Control   chan string
-	API       *APIStub
+	API       *accumulate.APIStub
 }
 
 func (m *Miner) Init(cfg *cfg.Config) {
@@ -23,13 +24,12 @@ func (m *Miner) Init(cfg *cfg.Config) {
 	// Input to the Miner
 	m.Control = make(chan string, 1) // The Hasher stops when told on this channel
 	// Outputs of hashers to the Miners
-	m.Solutions = make(chan hashing.PoWSolution, 1) // Solutions are written to this channel
+	m.Solutions = make(chan hashing.PoWSolution, 10) // Solutions are written to this channel
 
-	m.API = NewAPIStub(cfg)
+	m.API = accumulate.NewAPIStub(cfg)
 
 	m.Hashers = hashing.NewHashers(cfg.Instances, cfg.Seed, cfg.LX) // Allocate the Hashers
 	m.Hashers.SetSolutions(m.Solutions)                             // Override their Solutions channel
-	m.Hashers.Start()                                               // Start the Hashers
 }
 
 func (m *Miner) Stop() {
@@ -45,36 +45,42 @@ func (m *Miner) Run() {
 	if m.Started {
 		return
 	}
-	var best *hashing.PoWSolution
-	_ = best
 	m.Started = true
+
+	var best *hashing.PoWSolution
 	var height uint64
 	var hash []byte
-
-	m.Hashers.BlockHashes <- m.API.DNHash // Send the first DN Hash to mine
+	HashCounts := make(map[int]uint64)
 
 	for {
 		select {
-		case solution := <-m.Solutions:
-			if best == nil || solution.Pow > best.Pow {
-				solution.TokenURL = m.Cfg.TokenURL
+		case solution := <-m.Solutions: // New solutions have to be graded
+
+			HashCounts[int(solution.Instance)] = solution.HashCnt // Collect all the hashing counts from hashers
+
+			if best == nil || solution.Difficulty > best.Difficulty { // If the best so far on the block
+				solution.TokenURL = m.Cfg.TokenURL // Confi
 				best = &solution
-				m.API.WriteSolution(solution)
+				m.API.WriteSolution(solution, HashCounts)
 			}
+			continue
 		case cmd := <-m.Control:
 			if cmd == "stop" {
 				m.Stop()
 				return
 			}
 		default:
+
 		}
-		height, hash = m.API.GetNextPow(height)
-		if hash != nil {
-			m.Hashers.BlockHashes <- hash
-			fmt.Println()
-			best = new(hashing.PoWSolution)
+		height, hash = m.API.GetNextPow(height) //   Reads and processes all hashing records until the latest
+		if hash != nil {                        //   Not nil indicates a new block
+			m.Hashers.BlockHashes <- hash   // Send the hash to the hashers
+			if !m.Hashers.Started { // If hashers are not started, do so after we have a hash set to them.
+				m.Hashers.Start()
+			}
+			best = new(hashing.PoWSolution) // Create a nil PoWSolution, because this is a new block
 		} else {
-			time.Sleep(time.Second / 1000) // Sleep for 1/10 a second
+			time.Sleep(time.Second / 1000) //        Sleep for 1/10 a second
 		}
 	}
 

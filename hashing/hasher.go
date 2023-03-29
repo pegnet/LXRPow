@@ -3,22 +3,26 @@
 package hashing
 
 import (
-	"fmt"
+	"time"
 
 	"github.com/pegnet/LXRPow/pow"
 )
 
 type PoWSolution struct {
-	TokenURL string
-	Hash     []byte
-	Nonce    uint64
-	Pow      uint64
-	HashCnt  uint64
+	Block      uint64    // Block Number
+	TokenURL   string    // Payout token account
+	Instance   int16     // ID of the hasher producing this block
+	time       time.Time // Timestamp when block was produced
+	DNHash     []byte    // The hash of the block
+	Nonce      uint64    // Nonce that is the solution
+	Difficulty uint64    // Self-reported Difficulty
+	HashCnt    uint64    // Count of hashes performed so far
 }
 
 // All that is needed to create a Hasher instance.  Once it is created,
 // It will run and feed back solutions
 type Hasher struct {
+	Instance    int
 	CurrentHash []byte
 	Nonce       uint64
 	BlockHashes chan []byte
@@ -30,8 +34,9 @@ type Hasher struct {
 	LX          *pow.LxrPow
 }
 
-func NewHasher(nonce uint64, lx *pow.LxrPow) *Hasher {
+func NewHasher(instance int, nonce uint64, lx *pow.LxrPow) *Hasher {
 	m := new(Hasher)
+	m.Instance = instance
 	m.Nonce = nonce
 	m.LX = lx
 
@@ -51,7 +56,6 @@ func (m *Hasher) Stop() {
 	}
 	m.Control <- "stop"
 	m.Started = false
-	fmt.Println("Stopping Instance")
 }
 
 func (m *Hasher) Start() {
@@ -70,6 +74,7 @@ func (m *Hasher) Start() {
 			case hash = <-m.BlockHashes:
 				m.CurrentHash = hash
 				best = 0
+				continue // Read Hashes until the channel is empty
 			case cmd := <-m.Control:
 				if cmd == "stop" {
 					return
@@ -79,8 +84,10 @@ func (m *Hasher) Start() {
 			m.HashCnt++
 			m.Nonce ^= m.Nonce<<17 ^ m.Nonce>>9 ^ m.HashCnt // diff nonce for each instance
 			nPow := m.LX.LxrPoW(hash, m.Nonce)
-			if nPow > best {
-				m.Solutions <- PoWSolution{"", hash, m.Nonce, nPow, m.HashCnt}
+			if nPow > best || nPow > 0xFFFF000000000000 {
+				m.Solutions <- PoWSolution{
+					m.HashCnt, "", int16(m.Instance), time.Now(), hash, m.Nonce, nPow, m.HashCnt,
+				}
 				best = nPow
 
 			}

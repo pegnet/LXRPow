@@ -10,7 +10,7 @@ import (
 
 // All that is needed to create a Hasher instance.  Once it is created,
 // It will run and feed back solutions
-type Hashers struct {
+type HasherSet struct {
 	Instances   []*Hasher
 	BlockHashes chan []byte
 	Solutions   chan PoWSolution
@@ -24,19 +24,19 @@ type Hashers struct {
 // Create a set of Hashers to utilize the available cores on a computer
 // system.  A Solutions Channel is used by all the go routines to report
 // their best results.
-func NewHashers(Instances int, Nonce uint64, Lx *pow.LxrPow) *Hashers {
-	h := new(Hashers)
+func NewHashers(Instances int, Nonce uint64, Lx *pow.LxrPow) *HasherSet {
+	h := new(HasherSet)
 	h.Nonce = Nonce
 	h.Lx = Lx
-	h.BlockHashes = make(chan []byte, 1)
-	h.Solutions = make(chan PoWSolution, 1)
-	h.Control = make(chan string, 1)
+	h.BlockHashes = make(chan []byte, 10)
+	h.Solutions = make(chan PoWSolution, 10)
+	h.Control = make(chan string, 10)
 
 	for i := 0; i < Instances; i++ {
 		n := h.Nonce ^ uint64(i)
 		n = n<<19 ^ n>>11
 
-		instance := NewHasher(n, Lx)
+		instance := NewHasher(i, n, Lx)
 		instance.Solutions = h.Solutions // override Solutions channel
 
 		h.Instances = append(h.Instances, instance) // Collect all our instances
@@ -49,14 +49,14 @@ func NewHashers(Instances int, Nonce uint64, Lx *pow.LxrPow) *Hashers {
 
 // SetSolutions
 // Direct solutions to the given solutions channel
-func (h *Hashers) SetSolutions(solutions chan PoWSolution) {
+func (h *HasherSet) SetSolutions(solutions chan PoWSolution) {
 	h.Solutions = solutions
 	for _, hasher := range h.Instances {
 		hasher.Solutions = solutions
 	}
 }
 
-func (h *Hashers) Stop() {
+func (h *HasherSet) Stop() {
 	if !h.Started {
 		return
 	}
@@ -68,7 +68,7 @@ func (h *Hashers) Stop() {
 	}
 }
 
-func (h *Hashers) Start() {
+func (h *HasherSet) Start() {
 	if h.Started {
 		return
 	}
@@ -79,6 +79,9 @@ func (h *Hashers) Start() {
 			select {
 			case hash := <-h.BlockHashes:
 				for _, i := range h.Instances {
+					for !i.Started && len(i.BlockHashes) > 0 {
+						<-i.BlockHashes
+					}
 					i.BlockHashes <- hash
 				}
 			case cmd := <-h.Control:
