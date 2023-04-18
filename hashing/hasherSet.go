@@ -12,7 +12,7 @@ import (
 // It will run and feed back solutions
 type HasherSet struct {
 	Instances   []*Hasher
-	BlockHashes chan []byte
+	BlockHashes chan [32]byte
 	Solutions   chan PoWSolution
 	Control     chan string
 	Nonce       uint64
@@ -28,7 +28,7 @@ func NewHashers(Instances int, Nonce uint64, Lx *pow.LxrPow) *HasherSet {
 	h := new(HasherSet)
 	h.Nonce = Nonce
 	h.Lx = Lx
-	h.BlockHashes = make(chan []byte, 10)
+	h.BlockHashes = make(chan [32]byte, 10)
 	h.Solutions = make(chan PoWSolution, 10)
 	h.Control = make(chan string, 10)
 

@@ -15,7 +15,7 @@ type Miner struct {
 	Started   bool
 	Solutions chan hashing.PoWSolution
 	Control   chan string
-	API       *accumulate.APIStub
+	MinersIdx uint64
 }
 
 func (m *Miner) Init(cfg *cfg.Config) {
@@ -26,10 +26,9 @@ func (m *Miner) Init(cfg *cfg.Config) {
 	// Outputs of hashers to the Miners
 	m.Solutions = make(chan hashing.PoWSolution, 10) // Solutions are written to this channel
 
-	m.API = accumulate.NewAPIStub(cfg)
-
 	m.Hashers = hashing.NewHashers(cfg.Instances, cfg.Seed, cfg.LX) // Allocate the Hashers
 	m.Hashers.SetSolutions(m.Solutions)                             // Override their Solutions channel
+	m.MinersIdx = accumulate.MiningADI.RegisterMiner(m.Cfg.TokenURL)
 }
 
 func (m *Miner) Stop() {
@@ -48,20 +47,27 @@ func (m *Miner) Run() {
 	m.Started = true
 
 	var best *hashing.PoWSolution
-	var height uint64
-	var hash []byte
+	var settings *accumulate.Settings
 	HashCounts := make(map[int]uint64)
-
+	last := time.Now()
 	for {
 		select {
 		case solution := <-m.Solutions: // New solutions have to be graded
 
 			HashCounts[int(solution.Instance)] = solution.HashCnt // Collect all the hashing counts from hashers
 
-			if best == nil || solution.Difficulty > best.Difficulty { // If the best so far on the block
+			if best == nil || solution.Pow > best.Pow { // If the best so far on the block
 				solution.TokenURL = m.Cfg.TokenURL // Confi
 				best = &solution
-				m.API.WriteSolution(solution, HashCounts)
+				submission := new(accumulate.Submission)
+				submission.TimeStamp = time.Now()
+				submission.BlockIndex = settings.BlockIndex
+				submission.DNHash = settings.DNHash
+				submission.DNIndex = settings.DNIndex
+				submission.MinerIdx = m.MinersIdx
+				submission.Nonce = solution.Nonce
+				submission.PoW = solution.Pow
+				accumulate.MiningADI.AddSubmission(submission)
 			}
 			continue
 		case cmd := <-m.Control:
@@ -72,15 +78,19 @@ func (m *Miner) Run() {
 		default:
 
 		}
-		height, hash = m.API.GetNextPow(height) //   Reads and processes all hashing records until the latest
-		if hash != nil {                        //   Not nil indicates a new block
-			m.Hashers.BlockHashes <- hash   // Send the hash to the hashers
-			if !m.Hashers.Started { // If hashers are not started, do so after we have a hash set to them.
-				m.Hashers.Start()
+		if time.Since(last) > time.Second {
+			last = time.Now()
+			newSettings := accumulate.MiningADI.Sync() // Get the current state of mining
+			if settings == nil || newSettings.DNHash != settings.DNHash {
+				settings = newSettings
+				m.Hashers.BlockHashes <- settings.DNHash // Send the hash to the hashers
+				if !m.Hashers.Started {                  // If hashers are not started, do so after we have a hash set to them.
+					m.Hashers.Start()
+				}
+				best = new(hashing.PoWSolution) // Create a nil PoWSolution, because this is a new block
+			} else {
+				time.Sleep(time.Second / 1000) //        Sleep for 1/10 a second
 			}
-			best = new(hashing.PoWSolution) // Create a nil PoWSolution, because this is a new block
-		} else {
-			time.Sleep(time.Second / 1000) //        Sleep for 1/10 a second
 		}
 	}
 
