@@ -38,32 +38,26 @@ func NewLxrPow(Loops, Bits, Passes int) *LxrPow {
 func (lx LxrPow) LxrPoW(hash []byte, nonce uint64) (pow uint64) {
 	mask := lx.MapSize - 1
 
-	LHash := append([]byte{},
-		byte(nonce), byte(nonce>>8), byte(nonce>>16), byte(nonce>>24),
-		byte(nonce>>32), byte(nonce>>40), byte(nonce>>48), byte(nonce>>56))
-	LHash = append(LHash, hash...)
-	lHash := sha256.Sum256(LHash)
-	LHash = lHash[:]
+	var LHash [40]byte // Compute a 40 byte value from the hash and nonce
+	binary.BigEndian.PutUint64(LHash[:],nonce) // Put the nonce firsst
+	copy(LHash[8:],hash) // Then the given hash
+	lHash := sha256.Sum256(LHash[:]) // Do a sha256 of the 40 bytes 
+	copy(LHash[:],lHash[:32]) // Copy over the result
 
-	var state uint64
-	// We assume the hash provided is from a good cryptographic hash function, something like Sha256.
-	// Initialize state with the first 8 bytes of the given hash.
-	for i := 0; i < 8; i++ {
-		state = state<<8 ^ uint64(LHash[i])
-	}
+	state := binary.BigEndian.Uint64(lHash[:])
 
-	// Make a number of passes through the hash.  Note that we make complete passes over the hash,
-	// from the least significant byte to the most significant byte.  This ensures that we have to go
-	// through the complete process prior to knowing the PoW value.
-	//
-
+	// Make the specified "loops" through the LHash.  This is 40 bytes; 32 from the sha256 and
+	// 8 bytes from the trailing part of the hash.  Keeping or not keeping the trailing 8 only
+	// changes how many translations per loop are done.
 	for i := 0; i < lx.Loops; i++ {
-		for j := len(LHash) - 1; j >= 0; j-- {
-			state = state<<17 ^ state>>7 ^ uint64(lx.ByteMap[state&mask]^LHash[j])
+		for j,v := range LHash {
+			state = state<<17 ^ state>>7 ^ uint64(lx.ByteMap[state&mask]^v)
 			LHash[j] = byte(state)
 		}
 	}
-	return lx.pow(LHash)
+
+	final := sha256.Sum256(LHash[:]) // The Entire LHash translation must be done (can't skip anything)
+	return lx.pow(final[:32])        // Return the pow of the sha256 of the translated hash   
 }
 
 // Return the first 8 bytes of the modified hash as the difficulty

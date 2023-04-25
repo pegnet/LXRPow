@@ -47,9 +47,8 @@ func (m *Miner) Run() {
 	m.Started = true
 
 	var best *hashing.PoWSolution
-	var settings *accumulate.Settings
+	var settings accumulate.Settings
 	HashCounts := make(map[int]uint64)
-	last := time.Now()
 	for {
 		select {
 		case solution := <-m.Solutions: // New solutions have to be graded
@@ -67,7 +66,7 @@ func (m *Miner) Run() {
 				submission.MinerIdx = m.MinersIdx
 				submission.Nonce = solution.Nonce
 				submission.PoW = solution.Pow
-				accumulate.MiningADI.AddSubmission(submission)
+				accumulate.MiningADI.AddSubmission(*submission)
 			}
 			continue
 		case cmd := <-m.Control:
@@ -78,20 +77,18 @@ func (m *Miner) Run() {
 		default:
 
 		}
-		if time.Since(last) > time.Second {
-			last = time.Now()
-			newSettings := accumulate.MiningADI.Sync() // Get the current state of mining
-			if settings == nil || newSettings.DNHash != settings.DNHash {
-				settings = newSettings
-				m.Hashers.BlockHashes <- settings.DNHash // Send the hash to the hashers
-				if !m.Hashers.Started {                  // If hashers are not started, do so after we have a hash set to them.
-					m.Hashers.Start()
-				}
-				best = new(hashing.PoWSolution) // Create a nil PoWSolution, because this is a new block
-			} else {
-				time.Sleep(time.Second / 1000) //        Sleep for 1/10 a second
+		newSettings := accumulate.MiningADI.Sync() // Get the current state of mining
+		if newSettings.DNHash != settings.DNHash {
+			settings = newSettings
+			m.Hashers.BlockHashes <- settings.DNHash // Send the hash to the hashers
+			if !m.Hashers.Started {                  // If hashers are not started, do so after we have a hash set to them.
+				m.Hashers.Start()
 			}
+			best = new(hashing.PoWSolution) // Create a nil PoWSolution, because this is a new block
+		} else {
+			time.Sleep(time.Second / 100) //        Sleep for 1/10 a second
 		}
+
 	}
 
 }

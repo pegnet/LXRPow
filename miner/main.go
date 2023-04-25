@@ -17,15 +17,12 @@ import (
 	"github.com/pegnet/LXRPow/validator"
 )
 
-const LxrPoW_time int64 = 120
-
 func main() {
 	c := cfg.NewConfig()
 
 	var validatorList []*validator.Validator
 	for i := 0; i < 1; i++ { // Just running one validator for now
-		v := new(validator.Validator)
-		v.URL = sim.GetURL()
+		v := validator.NewValidator(sim.GetURL(),c.LX)
 		accumulate.MiningADI.RegisterMiner(v.URL)
 		validatorList = append(validatorList, v)
 	}

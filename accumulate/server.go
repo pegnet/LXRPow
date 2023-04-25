@@ -14,6 +14,7 @@ import (
 // Miners create submissions that are recorded on
 // acc://miningService/submissions scratch data account
 type Submission struct {
+	Valid      bool      // Not Persisted. Assumed valid, set to false if invalid
 	TimeStamp  time.Time //  8 Miner reported timestamp
 	DNIndex    uint64    //  8 Directory Network minor block index
 	DNHash     [32]byte  // 40 Directory Network Index
@@ -57,36 +58,33 @@ type PointsReport struct {
 // Settings
 // Mostly we update the Difficult
 type Settings struct {
-	TimeStamp  time.Time //  8 Timestamp
-	DNIndex    uint64    //  8 Miner block height
-	BlockIndex uint64    //  8 Block Index of activation for this set of settings
-	Loops      uint16    //  2 Loops over the hash (more loops, slower hash)
-	Bits       uint16    //  2 Number of bits addressing the ByteMap (30 = 1 GB)
-	DNHash     [32]byte  // 32 Hash to be mined
-	Difficulty uint64    //  8 Difficulty that marks the end of the Block
-	BlockTime  uint16    //  2 Seconds per block
-	PayoutFreq uint64    //  8 Payouts per 24 hours (starting at 0:00 UTC)
-	Qualifies  uint64    //  8 Number of submissions that are given points in a block
-	//                      86 Bytes gross total bytes
-}
-
-// Clone
-// Make a copy of the settings
-func (s Settings) Clone() *Settings {
-	return &s
+	TimeStamp        time.Time //  8 - Timestamp (persisted in nanoseconds)
+	WindowBlockIndex uint64    //  8 - Window Index of start of difficulty adjustment
+	WindowTimestamp  time.Time //  8 - Timestamp (persisted in nanoseconds)
+	Window           uint16    //  2 - Adjustment window in proof of work blocks
+	DNIndex          uint64    //  8 - Miner block height
+	BlockIndex       uint64    //  8 - Block Index of activation for this set of settings
+	Loops            uint16    //  2 - Loops over the hash (more loops, slower hash)
+	Bits             uint16    //  2 - Number of bits addressing the ByteMap (30 = 1 GB)
+	DNHash           [32]byte  // 32 - Hash to be mined
+	Difficulty       uint64    //  8 - Difficulty that marks the end of the Block
+	BlockTime        uint16    //  2 - Target block time in seconds per block
+	PayoutFreq       uint64    //  8 - Payouts per 24 hours (starting at 0:00 UTC)
+	Qualifies        uint64    //  8 - Number of submissions that are given points in a block
+	//                           104 Bytes gross total bytes
 }
 
 // MAdi
 // This struct represents the state kept in the mining ADI
 type MAdi struct {
-	Submissions  []*Submission     // Submissions from Miners
-	Accepted     []*Submission     // The Accepted winning entry
-	Settings     []*Settings       // Settings needed by miners to mine
+	Submissions  []Submission      // Submissions from Miners
+	Accepted     []Submission      // The Accepted winning entry for each block
+	Settings     []Settings        // Settings needed by miners to mine
 	Miners       map[string]uint64 // A look up table to make finding a miner's index fast
 	MinersIdx    []string          // The actual list of miners as they were registered
 	Validators   map[string]uint64 // A look up table to make finding a validator index fast
 	ValidatorIdx []string          // The actual list of validators as then are registered
-	PointsReport []*PointsReport   // Reports of points earned by miners
+	PointsReport []PointsReport    // Reports of points earned by miners
 }
 
 var MAdiMutex sync.RWMutex
@@ -117,15 +115,15 @@ func init() {
 	settings.TimeStamp = time.Now()                        // Current time
 	settings.DNIndex = 10000                               // Just pick an arbitrary minor block height
 	settings.BlockIndex = 1                                // Start at the first block
-	settings.Loops = 16                                    // LXPow: number of loops over the hash
-	settings.Bits = 30                                     // LXPow: Number of bits in the Byte Map lookup
+	settings.Loops = 32                                    // LXPow: number of loops over the hash
+	settings.Bits = 16                                     // LXPow: Number of bits in the Byte Map lookup
 	settings.DNHash = sha256.Sum256([]byte("first block")) // Hash of the first DNBlock to be mined
 	settings.Difficulty = 0xFFFFF00000000000               // A Starting difficulty target
 	settings.BlockTime = 600                               // 10 minutes
 	settings.PayoutFreq = 60 * 60 * 4                      // Every 4 hours (6 times a day)
 	settings.Qualifies = 100                               // How many submissions get points
 
-	MiningADI.Settings = append(MiningADI.Settings, settings)
+	MiningADI.Settings = append(MiningADI.Settings, *settings)
 }
 
 // RegisterMiner
@@ -144,6 +142,18 @@ func (m *MAdi) RegisterMiner(tokenUrl string) uint64 {
 	m.MinersIdx = append(m.MinersIdx, tokenUrl) // and in the list
 
 	return idx
+}
+
+// GetMinerUrl
+// Takes the miner index and returns the miner's URL
+func (m *MAdi) GetMinerUrl(minerIdx uint64) string {
+	MAdiMutex.Lock()
+	defer MAdiMutex.Unlock()
+
+	if int(minerIdx) >= len(m.MinersIdx) {
+		return ""
+	}
+	return m.MinersIdx[minerIdx]
 }
 
 // RegisterValidator
@@ -169,26 +179,11 @@ func (m *MAdi) RegisterValidator(bookUrl string) (validatorIdx uint64) {
 // Sync
 // Syncs with the Accumulate Protocol so we can trust our data.
 // If a nil is returned, then Syncing failed.
-func (m *MAdi) Sync() *Settings {
+func (m *MAdi) Sync() Settings {
+	MAdiMutex.Lock()
+	defer MAdiMutex.Unlock()
+	return m.Settings[len(m.Settings)-1]
 
-	if len(m.Settings) > 0 {
-
-		MAdiMutex.Lock()
-		settings := m.Settings[len(m.Settings)-1]
-		MAdiMutex.Unlock()
-
-		return settings
-	}
-
-	// Wait, perhaps forever, for settings to be written
-	for {
-		MAdiMutex.Unlock()
-		time.Sleep(100 * time.Millisecond)
-		MAdiMutex.Lock()
-		if len(m.Settings) > 0 {
-			return m.Settings[len(m.Settings)-1]
-		}
-	}
 }
 
 // GetBlock
@@ -197,25 +192,30 @@ func (m *MAdi) Sync() *Settings {
 // Submissions: all the submissions so far
 // the current block, and the lowest difficulty submitted.  If not synced,
 // the DNHash returned is nil
-func (m *MAdi) GetBlock() (DNHash [32]byte, submissions []*Submission) {
+func (m *MAdi) GetBlock() (DNHash [32]byte, submissions []Submission) {
 	settings := m.Sync()
-	if settings == nil {
-		return
-	}
 
 	MAdiMutex.Lock()
-	if len(m.Submissions)== 0 {
+	if len(m.Submissions) == 0 {
 		MAdiMutex.Unlock()
-		return settings.DNHash,submissions
+		return settings.DNHash, submissions
 	}
-	raw := append([]*Submission{}, m.Submissions[settings.BlockIndex:]...)
+	raw := append([]Submission{}, m.Submissions[settings.BlockIndex:]...)
 	MAdiMutex.Unlock()
-	var clean []*Submission
+	var clean []Submission
 
 	for _, sub := range raw {
-		if sub.DNHash == settings.DNHash {
-			clean = append(clean, sub)
+		if sub.DNHash != settings.DNHash {
+			continue
 		}
+		if sub.BlockIndex != settings.BlockIndex {
+			continue
+		}
+		if sub.PoW < 0xFFF0000000000000 {
+			continue
+		}
+
+		clean = append(clean, sub)
 	}
 	sort.Slice(clean, func(i, j int) bool { return clean[i].PoW < clean[j].PoW })
 	return settings.DNHash, clean
@@ -224,8 +224,15 @@ func (m *MAdi) GetBlock() (DNHash [32]byte, submissions []*Submission) {
 // AddSubmission
 // Does quality checks on the submission to avoid adding submissions
 // that cannot win points and wasting credits.
-func (m *MAdi) AddSubmission(sub *Submission) error {
+func (m *MAdi) AddSubmission(sub Submission) error {
 	settings := m.Sync()
+	_, submissions := m.GetBlock()
+	if len(submissions) > 0 && submissions[len(submissions)-1].PoW >= settings.Difficulty {
+		return nil // A solution has already been found
+	}
+	if sub.PoW < 0xFFF0000000000000 && sub.PoW < settings.Difficulty {
+		return nil // Ignore trivial difficulties
+	}
 	if sub.DNHash == settings.DNHash {
 		MAdiMutex.Lock()
 		m.Submissions = append(m.Submissions, sub)
@@ -236,7 +243,7 @@ func (m *MAdi) AddSubmission(sub *Submission) error {
 
 // AddSettings
 // Add a Settings Record to the Settings Account
-func (m *MAdi) AddSettings(settings *Settings) {
+func (m *MAdi) AddSettings(settings Settings) {
 	MAdiMutex.Lock()
 	defer MAdiMutex.Unlock()
 	m.Settings = append(m.Settings, settings)

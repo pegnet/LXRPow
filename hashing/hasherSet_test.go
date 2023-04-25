@@ -19,7 +19,7 @@ func Test_HasherSet(t *testing.T) {
 	hash := sha256.Sum256([]byte{1, 2, 3, 4})
 
 	fmt.Print("\nStart Hashing\n\n")
-	m.BlockHashes <- hash[:]
+	m.BlockHashes <- hash
 
 	var best PoWSolution
 	for i := 0; i < 1000; {
@@ -38,7 +38,7 @@ func Test_HasherSet(t *testing.T) {
 			if s.Pow > 0xFFFFF00000000000 {
 				best.Pow = 0
 				hash = sha256.Sum256(hash[:])
-				m.BlockHashes <- hash[:]
+				m.BlockHashes <- hash
 				i++
 			}
 		}

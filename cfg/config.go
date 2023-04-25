@@ -12,9 +12,10 @@ import (
 	"math/big"
 	"net/url"
 	"os"
+	"time"
 
+	"github.com/pegnet/LXRPow/accumulate"
 	"github.com/pegnet/LXRPow/pow"
-	"github.com/pegnet/LXRPow/sim"
 )
 
 type Config struct {
@@ -36,7 +37,6 @@ type Config struct {
 
 // Return a shallow copy of the configuration settings.
 func (c Config) Clone() *Config {
-	c.TokenURL = sim.GetURL()
 	c.RandomizeSeed()
 	return &c
 }
@@ -95,11 +95,11 @@ func (c *Config) Init() {
 	}
 
 	fmt.Printf("\nminer --index=%d --tokenurl=\"%s\" --instances=%d --minercnt=%d --loop=%d --bits=%d --phrase=\"%s\""+
-		" --randomize=%v --difficulty=0x%x --diffwindow=%d --blocktime=%d --timed=%v\n\n",
+		" --randomize=%v --difficulty=0x%x --diffwindow=%d --blocktime=%f --timed=%v\n\n",
 		c.Index, c.TokenURL, c.Instances, c.MinerCnt, c.Loop, c.Bits, c.Phrase,
 		c.Randomize, c.Difficulty, c.Window, c.BlockTime, c.Timed,
 	)
-	fmt.Printf("Filename: out-instances%d-minercnt%d-loop%d-difficulty0x%x-diffwindow%d-blocktime%d-timed_%v.txt\n\n",
+	fmt.Printf("Filename: out-instances%d-minercnt%d-loop%d-difficulty0x%x-diffwindow%d-blocktime%f-timed_%v.txt\n\n",
 		c.Instances, c.MinerCnt, c.Loop, c.Difficulty, c.Window, c.BlockTime, c.Timed)
 
 	if !ConfigIsValid(c) {
@@ -107,6 +107,20 @@ func (c *Config) Init() {
 	}
 
 	c.LX = pow.NewLxrPow(c.Loop, c.Bits, 6)
+
+	// for purposes of testing, we will assert settings given on the command line.
+	settings := accumulate.MiningADI.Sync()
+	settings.Bits = uint16(c.Bits)
+	settings.Loops = uint16(c.Loop)
+	settings.TimeStamp = time.Now()
+	settings.BlockTime = uint16(c.BlockTime)
+	settings.Difficulty = c.Difficulty
+	settings.Window = uint16(c.Window)
+	settings.TimeStamp = time.Now()
+	settings.WindowTimestamp = time.Now()
+	settings.WindowBlockIndex = 1
+	accumulate.MiningADI.Settings = append(accumulate.MiningADI.Settings,settings)
+
 }
 
 func NewConfig() *Config {
