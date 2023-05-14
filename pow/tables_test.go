@@ -5,6 +5,7 @@ package pow
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 func TestLxrPow_Init(t *testing.T) {
@@ -24,5 +25,6 @@ func TestLxrPow_Init(t *testing.T) {
 			}
 		}
 		fmt.Println()
+		time.Sleep(0)
 	}
 }

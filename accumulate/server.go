@@ -8,6 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pegnet/LXRPow/pow"
 )
 
 // Submission
@@ -61,8 +63,9 @@ type Settings struct {
 	TimeStamp        time.Time //  8 - Timestamp (persisted in nanoseconds)
 	WindowBlockIndex uint64    //  8 - Window Index of start of difficulty adjustment
 	WindowTimestamp  time.Time //  8 - Timestamp (persisted in nanoseconds)
-	Window           uint16    //  2 - Adjustment window in proof of work blocks
+	DiffWindow       uint16    //  2 - Adjustment window in proof of work blocks
 	DNIndex          uint64    //  8 - Miner block height
+	LastDiff         uint64    //  8 - Difficulty of the last rewarded (300 or less)
 	BlockIndex       uint64    //  8 - Block Index of activation for this set of settings
 	Loops            uint16    //  2 - Loops over the hash (more loops, slower hash)
 	Bits             uint16    //  2 - Number of bits addressing the ByteMap (30 = 1 GB)
@@ -71,7 +74,7 @@ type Settings struct {
 	BlockTime        uint16    //  2 - Target block time in seconds per block
 	PayoutFreq       uint64    //  8 - Payouts per 24 hours (starting at 0:00 UTC)
 	Qualifies        uint64    //  8 - Number of submissions that are given points in a block
-	//                           104 Bytes gross total bytes
+	//                           112 Bytes gross total bytes
 }
 
 // MAdi
@@ -85,6 +88,7 @@ type MAdi struct {
 	Validators   map[string]uint64 // A look up table to make finding a validator index fast
 	ValidatorIdx []string          // The actual list of validators as then are registered
 	PointsReport []PointsReport    // Reports of points earned by miners
+	LX           *pow.LxrPow       // Not persisted.
 }
 
 var MAdiMutex sync.RWMutex
@@ -209,9 +213,6 @@ func (m *MAdi) GetBlock() (DNHash [32]byte, submissions []Submission) {
 			continue
 		}
 		if sub.BlockIndex != settings.BlockIndex {
-			continue
-		}
-		if sub.PoW < 0xFFF0000000000000 {
 			continue
 		}
 

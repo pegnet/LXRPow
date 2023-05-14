@@ -42,9 +42,9 @@
             "request": "launch",
             "mode": "auto",
             "program": "miner/main.go",
-            "args": ["--index","1","--tokenurl","redwagon.acme/tokens","--instances","8","--minercnt=100",
-            "--loop","32","--bits","30","--randomize=false","--difficulty","0xffff000000000000",
-            "--diffwindow","5","--blocktime","10","timed=false" ]
+            "args": ["--index=1","--tokenurl","redwagon.acme/tokens","--instances=8","--minercnt=100",
+            "--loop=32","--bits=30","--randomize=false","--difficulty=0xffff000000000000",
+            "--diffwindow=5","--blocktime=10","timed=false" ]
         },
         { // Runs 7 instances of the hasher while mining
             "name": "Run 7",

@@ -19,20 +19,20 @@ import (
 )
 
 type Config struct {
-	Index      uint64              // Index of this mining instance
-	TokenURL   string              // URL for rewards
-	Instances  int                 // How many hashers to run
-	MinerCnt   int                 // Number of miners to run
-	Loop       int                 // How many times we loop over a hash computing PoW
-	Bits       int                 // Number of bits in the size of the ByteMap (30 == 1GB ByteMap)
-	Phrase     string              // A phrase used to create the seed nonce for mining
-	Randomize  bool                // Use an OS generated random number to avoid seed collisions
-	Difficulty uint64              // The difficulty limit (if using difficulty to end mining blocks)
-	Window     int                 // Determines Difficulty adjustments, when ending blocks with difficulty
-	BlockTime  float64             // Used when ending blocks with time (uniform blocks)
-	Timed      bool                // True if using timed blocks, false using difficulty
-	Seed       uint64              // Seed for all the miners
-	LX         *pow.LxrPow         // The Proof of work function to be used.
+	Index      uint64      // Index of this mining instance
+	TokenURL   string      // URL for rewards
+	Instances  int         // How many hashers to run
+	MinerCnt   int         // Number of miners to run
+	Loop       int         // How many times we loop over a hash computing PoW
+	Bits       int         // Number of bits in the size of the ByteMap (30 == 1GB ByteMap)
+	Phrase     string      // A phrase used to create the seed nonce for mining
+	Randomize  bool        // Use an OS generated random number to avoid seed collisions
+	Difficulty uint64      // The difficulty limit (if using difficulty to end mining blocks)
+	DiffWindow int         // Determines Difficulty adjustments, when ending blocks with difficulty
+	BlockTime  float64     // Used when ending blocks with time (uniform blocks)
+	Timed      bool        // True if using timed blocks, false using difficulty
+	Seed       uint64      // Seed for all the miners
+	LX         *pow.LxrPow // The Proof of work function to be used.
 }
 
 // Return a shallow copy of the configuration settings.
@@ -78,7 +78,7 @@ func (c *Config) Init() {
 	c.Phrase = *pPhrase
 	c.Randomize = *pRandomize
 	c.Difficulty = *pDifficulty
-	c.Window = *pDiffWindow
+	c.DiffWindow = *pDiffWindow
 	c.BlockTime = *pBlockTime
 	c.Timed = *pTimed
 
@@ -97,17 +97,17 @@ func (c *Config) Init() {
 	fmt.Printf("\nminer --index=%d --tokenurl=\"%s\" --instances=%d --minercnt=%d --loop=%d --bits=%d --phrase=\"%s\""+
 		" --randomize=%v --difficulty=0x%x --diffwindow=%d --blocktime=%f --timed=%v\n\n",
 		c.Index, c.TokenURL, c.Instances, c.MinerCnt, c.Loop, c.Bits, c.Phrase,
-		c.Randomize, c.Difficulty, c.Window, c.BlockTime, c.Timed,
+		c.Randomize, c.Difficulty, c.DiffWindow, c.BlockTime, c.Timed,
 	)
 	fmt.Printf("Filename: out-instances%d-minercnt%d-loop%d-difficulty0x%x-diffwindow%d-blocktime%f-timed_%v.txt\n\n",
-		c.Instances, c.MinerCnt, c.Loop, c.Difficulty, c.Window, c.BlockTime, c.Timed)
+		c.Instances, c.MinerCnt, c.Loop, c.Difficulty, c.DiffWindow, c.BlockTime, c.Timed)
 
 	if !ConfigIsValid(c) {
 		os.Exit(1)
 	}
 
 	c.LX = pow.NewLxrPow(c.Loop, c.Bits, 6)
-
+	accumulate.MiningADI.LX = c.LX
 	// for purposes of testing, we will assert settings given on the command line.
 	settings := accumulate.MiningADI.Sync()
 	settings.Bits = uint16(c.Bits)
@@ -115,11 +115,11 @@ func (c *Config) Init() {
 	settings.TimeStamp = time.Now()
 	settings.BlockTime = uint16(c.BlockTime)
 	settings.Difficulty = c.Difficulty
-	settings.Window = uint16(c.Window)
+	settings.DiffWindow = uint16(c.DiffWindow)
 	settings.TimeStamp = time.Now()
 	settings.WindowTimestamp = time.Now()
 	settings.WindowBlockIndex = 1
-	accumulate.MiningADI.Settings = append(accumulate.MiningADI.Settings,settings)
+	accumulate.MiningADI.Settings = append(accumulate.MiningADI.Settings, settings)
 
 }
 
@@ -131,7 +131,7 @@ func NewConfig() *Config {
 
 // ConfigIsValid
 // Do everything we can to validate the configuration provided to us.  Right
-// now everything is on the commandline, and we are doing some checks.  But this
+// now everything is on the command line, and we are doing some checks.  But this
 // could be more complex and more user friendly; that will be done here.
 func ConfigIsValid(cfg *Config) bool {
 	success := true

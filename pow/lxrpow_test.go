@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	humanize "github.com/dustin/go-humanize"
 )
 
 // Using this test to check the performance of the LxrPow
@@ -16,7 +18,6 @@ func Test_LxrPoWSpeed(t *testing.T) {
 	doLxPow := true
 
 	lx := new(LxrPow).Init(16, 30, 6)
-
 	type result struct{ nonce, pow uint64 }
 	results := make(chan result, 100)
 
@@ -72,5 +73,59 @@ func Test_LxrPoWSpeed(t *testing.T) {
 			time.Sleep(5 * time.Second)
 		}
 
+	}
+}
+
+// Using this test to check the performance of the LxrPow
+func Test_Sha256PoWSpeed(t *testing.T) {
+	oprHash := sha256.Sum256([]byte("This is a test"))
+	var hashCnt int64
+	start := time.Now()
+	fmt.Println("Starting")
+	// pull the results, and print the best hashes
+	for {
+		for i := 0; i < 100000; i++ {
+			hashCnt++
+			oprHash = sha256.Sum256(oprHash[:])
+		}
+		current := time.Since(start)
+		rate := float64(hashCnt) / float64(current.Nanoseconds()) * 1000000000
+		fmt.Printf("      time: %10s TH: %10d H/s: %12.5f \n",
+			fmt.Sprintf("%3d:%02d:%02d", int(current.Hours()), int(current.Minutes())%60, int(current.Seconds())%60),
+			hashCnt, rate)
+	}
+}
+
+// Using this test to check the performance of the LxrPow
+func Test_StartValue(t *testing.T) {
+	lx := new(LxrPow)
+	_ = lx
+	Hash := sha256.Sum256([]byte{1, 2, 4, 5, 7, 3, 1})
+
+	for i := 0; i < 10; i++ {
+		Hash = sha256.Sum256(Hash[:])	
+		var last, d, diff, under, cnt uint64
+		for i := 0; i < 100000; i++ {
+			_, state := lx.mix(Hash[:],uint64(i))
+			//state := binary.BigEndian.Uint64(Hash[:])
+			//Hash = sha256.Sum256(Hash[:])
+			
+			
+			cnt++
+			if last > state {
+				d += last - state
+			} else {
+				d += state - last
+			}
+			last = state
+			d = d % (1024 * 1024 * 1024)
+			if d < 1024 {
+				under++
+			}
+			diff += d	
+		}
+		fmt.Printf("%d %x\n",i,Hash[:10])
+		fmt.Printf("average jump: %s\n", humanize.Comma(int64(diff/cnt%(1024*1024*1024))))
+		fmt.Printf("Under 1k: %d \n", under)
 	}
 }

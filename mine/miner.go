@@ -46,7 +46,7 @@ func (m *Miner) Run() {
 	}
 	m.Started = true
 
-	var best *hashing.PoWSolution
+	var limit uint64 = 0xFFF0000000000000
 	var settings accumulate.Settings
 	HashCounts := make(map[int]uint64)
 	for {
@@ -55,9 +55,8 @@ func (m *Miner) Run() {
 
 			HashCounts[int(solution.Instance)] = solution.HashCnt // Collect all the hashing counts from hashers
 
-			if best == nil || solution.Pow > best.Pow { // If the best so far on the block
-				solution.TokenURL = m.Cfg.TokenURL // Confi
-				best = &solution
+			if solution.Pow > limit { // If the best so far on the block
+				solution.TokenURL = m.Cfg.TokenURL // Save the TokenURL
 				submission := new(accumulate.Submission)
 				submission.TimeStamp = time.Now()
 				submission.BlockIndex = settings.BlockIndex
@@ -79,12 +78,12 @@ func (m *Miner) Run() {
 		}
 		newSettings := accumulate.MiningADI.Sync() // Get the current state of mining
 		if newSettings.DNHash != settings.DNHash {
+			
 			settings = newSettings
-			m.Hashers.BlockHashes <- settings.DNHash // Send the hash to the hashers
+			m.Hashers.BlockHashes <- hashing.Hash{Hash:settings.DNHash,Limit:limit} // Send the hash to the hashers
 			if !m.Hashers.Started {                  // If hashers are not started, do so after we have a hash set to them.
 				m.Hashers.Start()
 			}
-			best = new(hashing.PoWSolution) // Create a nil PoWSolution, because this is a new block
 		} else {
 			time.Sleep(time.Second / 100) //        Sleep for 1/10 a second
 		}

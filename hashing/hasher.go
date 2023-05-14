@@ -25,7 +25,7 @@ type Hasher struct {
 	Instance    int
 	CurrentHash [32]byte
 	Nonce       uint64
-	BlockHashes chan [32]byte
+	BlockHashes chan Hash
 	Solutions   chan PoWSolution
 	Control     chan string
 	Best        uint64
@@ -41,8 +41,8 @@ func NewHasher(instance int, nonce uint64, lx *pow.LxrPow) *Hasher {
 	m.LX = lx
 
 	// Inputs to the Hasher
-	m.Control = make(chan string, 1)       // The Hasher stops when told on this channel
-	m.BlockHashes = make(chan [32]byte, 1) // Hashes to Hash are read from this channel
+	m.Control = make(chan string, 1)   // The Hasher stops when told on this channel
+	m.BlockHashes = make(chan Hash, 1) // Hashes to Hash are read from this channel
 
 	// Outputs from the Hasher (can be overwritten and thus shared across Hashers)
 	m.Solutions = make(chan PoWSolution, 1) // Solutions are written to this channel
@@ -65,15 +65,15 @@ func (m *Hasher) Start() {
 
 	m.Started = true
 	go func() {
-		var best uint64
-		var hash [32]byte
+		var limit uint64
 
-		hash = <-m.BlockHashes
+		hash := <-m.BlockHashes
 		for {
+			
 			select {
 			case hash = <-m.BlockHashes:
-				m.CurrentHash = hash
-				best = 0
+				m.CurrentHash = hash.Hash
+				limit = hash.Limit
 				continue // Read Hashes until the channel is empty
 			case cmd := <-m.Control:
 				if cmd == "stop" {
@@ -83,13 +83,11 @@ func (m *Hasher) Start() {
 			}
 			m.HashCnt++
 			m.Nonce ^= m.Nonce<<17 ^ m.Nonce>>9 ^ m.HashCnt // diff nonce for each instance
-			nPow := m.LX.LxrPoW(hash[:], m.Nonce)
-			if nPow > best || nPow > 0xFFFF000000000000 {
+			nPow := m.LX.LxrPoW(hash.Hash[:], m.Nonce)
+			if nPow > limit {
 				m.Solutions <- PoWSolution{
-					m.HashCnt, "", int16(m.Instance), time.Now(), hash, m.Nonce, nPow, m.HashCnt,
+					m.HashCnt, "", int16(m.Instance), time.Now(), hash.Hash, m.Nonce, nPow, m.HashCnt,
 				}
-				best = nPow
-
 			}
 		}
 	}()

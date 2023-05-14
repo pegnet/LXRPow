@@ -9,10 +9,6 @@ import (
 	"github.com/pegnet/LXRPow/pow"
 )
 
-var DifficultyPeriod = 75 // When Adjusting difficulty, the average time of the last
-//                  128 blocks is used.  The exponential distribution of block times
-//                  is such that a period less than 128 doesn't really work.
-
 type Validator struct {
 	URL        string
 	LX         *pow.LxrPow
@@ -28,6 +24,41 @@ func NewValidator(url string, lx *pow.LxrPow) *Validator {
 	return v
 }
 
+// EndOfBlock
+// Returns true if we have an end of block, and the index of the last
+// entry of the block (first to be > difficulty)
+// Assumes submissions are sorted
+func (v *Validator) EndOfBlock(settings *accumulate.Settings, submissions []accumulate.Submission) (bool, int) {
+	if len(submissions) == 0 || submissions[len(submissions)-1].PoW < settings.Difficulty {
+		return false, 0
+	}
+	valid := -1
+	i := len(submissions) - 1
+	for ; i >= 0; i-- {
+		if submissions[i].PoW < settings.Difficulty {
+			i++ // Add back to the last valid
+			break
+		} else if v.ValidateSubmission(*settings, submissions[i]) {
+			valid = i
+		}
+
+	}
+	return valid >= 0, valid
+}
+
+// TrimToBlock
+// Return a list of submissions that are trimmed to the 300 that will have points counted
+func (v *Validator) TrimToBlock(settings accumulate.Settings, submissions []accumulate.Submission) []accumulate.Submission {
+
+	var PointWinners []accumulate.Submission
+	for _, s := range submissions {
+		if v.ValidateSubmission(settings, s) {
+			PointWinners = append(PointWinners, s)
+		}
+	}
+	return PointWinners
+}
+
 // Start
 // Updates the settings on Accumulate
 func (v *Validator) Start() {
@@ -35,54 +66,59 @@ func (v *Validator) Start() {
 		time.Sleep(time.Second)
 		settings := accumulate.MiningADI.Sync()
 		dnHash, submissions := accumulate.MiningADI.GetBlock()
-		if len(submissions) > 0 {
-			last := submissions[len(submissions)-1]
-			if last.PoW > settings.Difficulty {
+		EoB, lastEntry := v.EndOfBlock(&settings, submissions)
+		if EoB {
 
-				// If this instance is the leader, compute and write the settings.  Need to
-				// add some code to wait for the new settings, then validate the new settings,
-				// and select a new leader if the settings written by the leader are not valid.
-				newSettings := settings
-				newSettings.DNHash = sha256.Sum256(dnHash[:])
-				newSettings.TimeStamp = time.Now()
-				newSettings.DNIndex = settings.DNIndex + 100
-				newSettings.BlockIndex = settings.BlockIndex + 1
-				LastBlockTime, newDiff, windowBlockIndex := v.AdjustDifficulty(settings, newSettings)
-				newSettings.WindowBlockIndex = uint64(windowBlockIndex)
-				if newDiff != newSettings.Difficulty {
-					v.OldDiff = newSettings.Difficulty
-					newSettings.Difficulty = newDiff
-				}
+			submissions = v.TrimToBlock(settings, submissions[:lastEntry+1])
+			// If this instance is the leader, compute and write the settings.  Need to
+			// add some code to wait for the new settings, then validate the new settings,
+			// and select a new leader if the settings written by the leader are not valid.
+			newSettings := settings
+			newSettings.DNHash = sha256.Sum256(dnHash[:])
+			newSettings.TimeStamp = time.Now()
+			newSettings.DNIndex = settings.DNIndex + 100
+			newSettings.BlockIndex = settings.BlockIndex + 1
+			LastBlockTime, newDiff, windowBlockIndex := v.AdjustDifficulty(settings, newSettings)
+			newSettings.WindowBlockIndex = uint64(windowBlockIndex)
+			if newDiff != newSettings.Difficulty {
+				v.OldDiff = newSettings.Difficulty
+				newSettings.Difficulty = newDiff
+			}
 
-				// Need to add grading and point tracking
-				minutes := int(LastBlockTime) / 60
-				seconds := LastBlockTime - float64(minutes*60)
+			// Need to add grading and point tracking
+			minutes := int(LastBlockTime) / 60
+			seconds := LastBlockTime - float64(minutes*60)
 
-				fmt.Print("TimeStamp                 DNIndex DNHash           BlockIndex Nonce            MinderIdx Pow              Url\n")
+			var sum float64
+			for _, v := range v.BlockTimes {
+				sum += v
+			}
+			btl := float64(len(v.BlockTimes))
+
+			go func(submissions []accumulate.Submission) {
+				out := "TimeStamp                 DNIndex DNHash           BlockIndex Nonce            MinerIdx  Pow              Url\n"
 				for _, n := range submissions {
 					t := n.TimeStamp.Format("01/02/06 03:04:05.000")
 					url := accumulate.MiningADI.GetMinerUrl(n.MinerIdx)
-					fmt.Printf("%25s %7d %016x %10d %016x %9d %016x %s\n",
+					out += fmt.Sprintf("%25s %7d %016x %10d %016x %9d %016x %s\n",
 						t, n.DNIndex, n.DNHash[:8], n.BlockIndex, n.Nonce, n.MinerIdx, n.PoW, url)
 				}
-				var sum float64
-				for _, v := range v.BlockTimes {
-					sum += v
-				}
-				btl := float64(len(v.BlockTimes))
-				fmt.Print("TimeStamp                 DNIndex DNHash           BlockIndex Nonce            MinderIdx Pow              Difficulty       Url\n")
-				fmt.Printf("AvgBlockTime=   %8.3f\n", sum/btl)
-				fmt.Printf("Difficulty=     %016x\n", settings.Difficulty)
-				fmt.Printf("PreviousDiff=   %016x\n", v.OldDiff)
-				fmt.Printf("BlockTime =     %d:%06.3f\n", minutes, seconds)
-				fmt.Printf("#submissions=   %d\n", len(submissions))
-				fmt.Printf("block number=   %d\n", last.BlockIndex)
-				fmt.Printf("DNBlock number= %d\n\n", last.DNIndex)
+				out += "TimeStamp                 DNIndex DNHash           BlockIndex Nonce            MinerIdx  Pow              Difficulty       Url\n"
 
-				accumulate.MiningADI.AddSettings(newSettings)
+				out += fmt.Sprintf("TargetBlockTime=   %4d\n", settings.BlockTime)
+				out += fmt.Sprintf("AvgBlockTime=    %8.3f\n", sum/btl)
+				out += fmt.Sprintf("Difficulty=         %016x\n", settings.Difficulty)
+				out += fmt.Sprintf("PreviousDiff=       %016x\n", v.OldDiff)
+				out += fmt.Sprintf("BlockTime =         %d:%06.3f\n", minutes, seconds)
+				out += fmt.Sprintf("#submissions=       %d\n", len(submissions))
+				out += fmt.Sprintf("block number=       %d\n", settings.BlockIndex)
+				out += fmt.Sprintf("DNBlock number=     %d\n\n", settings.DNIndex)
+				fmt.Print(out)
+			}(submissions)
+			accumulate.MiningADI.AddSettings(newSettings)
 
-			}
 		}
+
 	}
 }
 
@@ -94,7 +130,7 @@ func (v *Validator) AdjustDifficulty(settings, newSettings accumulate.Settings) 
 
 	lastBlockTime = newSettings.TimeStamp.Sub(settings.TimeStamp).Seconds()
 	v.BlockTimes = append(v.BlockTimes, lastBlockTime)
-	if uint16(settings.BlockIndex-settings.WindowBlockIndex+1) >= settings.Window {
+	if uint16(len(v.BlockTimes)) >= settings.DiffWindow {
 
 		var sum float64
 		var cnt float64
@@ -102,14 +138,9 @@ func (v *Validator) AdjustDifficulty(settings, newSettings accumulate.Settings) 
 			sum += v
 			cnt += 1
 		}
-		btl := float64(len(v.BlockTimes))
 		avgBlkTime := sum / cnt
-		if len(v.BlockTimes) >= DifficultyPeriod {
-			copy(v.BlockTimes[:settings.Window], v.BlockTimes[settings.Window:])
-			v.BlockTimes = v.BlockTimes[:DifficultyPeriod-int(settings.Window)]
-		}
 
-		dPercent := (float64(settings.BlockTime) - avgBlkTime) / btl
+		dPercent := (float64(settings.BlockTime) - avgBlkTime) / 2
 		if dPercent > .5 {
 			dPercent = .5
 		}
@@ -118,6 +149,8 @@ func (v *Validator) AdjustDifficulty(settings, newSettings accumulate.Settings) 
 		}
 		fDifficulty := float64(-settings.Difficulty)  // Use the 2's complement of the Difficulty because leading F's (in hex) are hard to deal with
 		nd := uint64(-(fDifficulty * (1 - dPercent))) // Edge closer by 1/5 the error since we are using a 128 blk average
+		v.BlockTimes = v.BlockTimes[:0]               // Clear the list of block times
+
 		return lastBlockTime, nd, uint16(settings.BlockIndex + 1)
 	}
 	return lastBlockTime, settings.Difficulty, uint16(settings.WindowBlockIndex)
@@ -131,14 +164,13 @@ func (v *Validator) ValidateSubmission(settings accumulate.Settings, submission 
 		return false
 	case submission.DNIndex != settings.DNIndex:
 		return false
-	}
-	if accumulate.MiningADI.GetMinerUrl(submission.MinerIdx) == "" { // Miner must be registered
+	case accumulate.MiningADI.GetMinerUrl(submission.MinerIdx) == "":
+		return false
+	case v.LX.LxrPoW(submission.DNHash[:], submission.Nonce) != submission.PoW:
 		return false
 	}
 
-	// Because testing the Pow is the most expensive test, we do it last
-	actualPow := v.LX.LxrPoW(submission.DNHash[:], submission.Nonce)
-	return actualPow == submission.PoW
+	return true
 }
 
 func (v *Validator) Grade(settings accumulate.Settings, submissions []accumulate.Submission) (winner accumulate.Submission, difficulty uint64) {

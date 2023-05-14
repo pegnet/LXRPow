@@ -4,15 +4,21 @@ package hashing
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/pegnet/LXRPow/pow"
 )
+
+type Hash struct {
+	Hash  [32]byte // The Hash to work on
+	Limit uint64   // Solutions must be over the given limit
+}
 
 // All that is needed to create a Hasher instance.  Once it is created,
 // It will run and feed back solutions
 type HasherSet struct {
 	Instances   []*Hasher
-	BlockHashes chan [32]byte
+	BlockHashes chan Hash
 	Solutions   chan PoWSolution
 	Control     chan string
 	Nonce       uint64
@@ -28,7 +34,7 @@ func NewHashers(Instances int, Nonce uint64, Lx *pow.LxrPow) *HasherSet {
 	h := new(HasherSet)
 	h.Nonce = Nonce
 	h.Lx = Lx
-	h.BlockHashes = make(chan [32]byte, 10)
+	h.BlockHashes = make(chan Hash, 10)
 	h.Solutions = make(chan PoWSolution, 10)
 	h.Control = make(chan string, 10)
 
@@ -88,6 +94,8 @@ func (h *HasherSet) Start() {
 				if cmd == "stop" {
 					return
 				}
+			default:
+				time.Sleep(time.Second/4)
 			}
 		}
 	}()
