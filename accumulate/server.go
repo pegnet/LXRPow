@@ -231,15 +231,30 @@ func (m *MAdi) AddSubmission(sub Submission) error {
 	if len(submissions) > 0 && submissions[len(submissions)-1].PoW >= settings.Difficulty {
 		return nil // A solution has already been found
 	}
-	if sub.PoW < 0xFFF0000000000000 && sub.PoW < settings.Difficulty {
-		return nil // Ignore trivial difficulties
-	}
-	if sub.DNHash == settings.DNHash {
+	if ValidateSubmission(m.LX,settings,sub) {
 		MAdiMutex.Lock()
-		m.Submissions = append(m.Submissions, sub)
+		m.Submissions = append(m.Submissions,sub)
 		MAdiMutex.Unlock()
 	}
+
 	return nil
+}
+
+func ValidateSubmission(LX *pow.LxrPow, settings Settings, submission Submission) bool {
+	switch {
+	case settings.BlockIndex != submission.BlockIndex:
+		return false
+	case settings.DNHash != submission.DNHash:
+		return false
+	case submission.DNIndex != settings.DNIndex:
+		return false
+	case MiningADI.GetMinerUrl(submission.MinerIdx) == "":
+		return false
+	case LX != nil && LX.LxrPoW(submission.DNHash[:], submission.Nonce) != submission.PoW:
+		return false
+	}
+
+	return true
 }
 
 // AddSettings

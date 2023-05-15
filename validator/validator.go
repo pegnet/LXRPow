@@ -38,7 +38,7 @@ func (v *Validator) EndOfBlock(settings *accumulate.Settings, submissions []accu
 		if submissions[i].PoW < settings.Difficulty {
 			i++ // Add back to the last valid
 			break
-		} else if v.ValidateSubmission(*settings, submissions[i]) {
+		} else if accumulate.ValidateSubmission(v.LX, *settings, submissions[i]) {
 			valid = i
 		}
 
@@ -52,7 +52,7 @@ func (v *Validator) TrimToBlock(settings accumulate.Settings, submissions []accu
 
 	var PointWinners []accumulate.Submission
 	for _, s := range submissions {
-		if v.ValidateSubmission(settings, s) {
+		if accumulate.ValidateSubmission(v.LX, settings, s) {
 			PointWinners = append(PointWinners, s)
 		}
 	}
@@ -154,23 +154,6 @@ func (v *Validator) AdjustDifficulty(settings, newSettings accumulate.Settings) 
 		return lastBlockTime, nd, uint16(settings.BlockIndex + 1)
 	}
 	return lastBlockTime, settings.Difficulty, uint16(settings.WindowBlockIndex)
-}
-
-func (v *Validator) ValidateSubmission(settings accumulate.Settings, submission accumulate.Submission) bool {
-	switch {
-	case settings.BlockIndex != submission.BlockIndex:
-		return false
-	case settings.DNHash != submission.DNHash:
-		return false
-	case submission.DNIndex != settings.DNIndex:
-		return false
-	case accumulate.MiningADI.GetMinerUrl(submission.MinerIdx) == "":
-		return false
-	case v.LX.LxrPoW(submission.DNHash[:], submission.Nonce) != submission.PoW:
-		return false
-	}
-
-	return true
 }
 
 func (v *Validator) Grade(settings accumulate.Settings, submissions []accumulate.Submission) (winner accumulate.Submission, difficulty uint64) {
